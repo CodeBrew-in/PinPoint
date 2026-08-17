@@ -1,0 +1,513 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{array}
+
+% -----------------------------------------------------
+% bvraghav-tiet-ucs503p-article.sty
+% -----------------------------------------------------
+
+% Variable: Lab Instructor
+\makeatletter
+\newcommand{\BvrSetLabInstructor}[1]{%
+  \gdef\Bvr@LabInstructor{#1}}
+\newcommand{\Bvr@LabInstructor}{}
+\newcommand{\BvrLabInstructorValue}{\Bvr@LabInstructor}
+\makeatother
+
+% Add subtitle
+\usepackage{titling}
+\pretitle{\begin{center}\bfseries\fontsize{18bp}{18bp}\selectfont}
+\makeatletter
+\newcommand{\BvrSubtitle}[1]{%
+  \posttitle{%
+    \par\end{center}
+    \begin{center}\large#1\end{center}
+    \vskip 0.5em}%
+}
+\makeatother
+
+% Hints in section titles
+\newcommand{\BvrHint}[1]{%
+  {\normalfont\normalsize\itshape\hfill #1}}
+
+% -----------------------------------------------------
+
+\title{PinPoint: A Community Driven Map for Local Discoveries}
+
+\BvrSetLabInstructor{}
+
+\BvrSubtitle{%
+  Project Proposal for UCS503 \\
+  Software Engineering \\
+  Thapar Institute of Engineering and Technology
+}
+
+\author{
+  Tanmay Singh, COE%
+  \thanks{Roll No: \texttt{1024030338},
+  Email: \texttt{tsingh2\_be24@thapar.edu}}
+  \and
+  Sanehbir Kaur, COE%
+  \thanks{Roll No: \texttt{1024030322},
+  Email: \texttt{skaur5\_be24@thapar.edu}}
+}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Higher Order Goal%
+  \BvrHint{\ldots primary motivation}}
+
+The project aims to provide a structured way to preserve and discover local
+geographic knowledge that is often informal, temporary, personal, or difficult
+to represent using conventional digital maps. The immediate engineering
+objective is to build a deployable web platform where users can capture,
+organize, discover, verify, and maintain such locations using geo tagged
+photographs.
+
+The project is designed as a four month software engineering effort with
+emphasis on secure architecture, geospatial data management, community
+workflows, maintainability, testing, and deployment.
+
+\section{Time to Value%
+  \BvrHint{\ldots development approach}}
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item The project will be developed incrementally, beginning with
+    authentication, maps, geo tagged locations, photographs, and
+    public and private visibility.
+    
+    \item Moderate features such as search, filtering, community verification,
+    conflict handling, and freshness tracking will follow the basic system.
+    
+    \item Advanced AI assisted classification, similarity detection,
+    moderation, and production monitoring will be implemented after the core
+    workflow is stable.
+    
+    \item Git based version control, automated testing, and CI/CD will be
+    integrated throughout development rather than added at the end.
+\end{itemize}
+
+\section{Problem Statement}
+
+Conventional digital maps are effective at representing established
+businesses, roads, addresses, and recognized points of interest. However,
+many useful locations are informal, temporary, locally known, or difficult to
+represent as conventional places.
+
+Examples include:
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item Underrated food stalls and local vendors
+    \item Scenic viewpoints and sunset locations
+    \item Trail entrances and local shortcuts
+    \item Temporary markets
+    \item Public facilities
+    \item Community gathering spots
+    \item Lesser known local attractions
+\end{itemize}
+
+Information about these locations is commonly shared through personal
+recommendations, social media, or messaging groups. Such information is
+therefore difficult to discover, organize, verify, and preserve.
+
+The problem is that useful local geographic knowledge exists, but there is no
+structured community driven system specifically designed for capturing and
+discovering these locations while also allowing users to maintain private
+personal maps.
+
+\section{Proposed Solution%
+  \BvrHint{\ldots Software Proposition}}
+
+\subsection{Overview}
+
+Build a \textbf{web based} crowdsourced mapping platform called
+\textbf{PinPoint} with the following components:
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item \textbf{Public Maps:} users can publish useful local locations for
+    discovery by the wider community.
+    
+    \item \textbf{My Maps:} users can maintain private maps containing
+    personal locations, memories, or places that should not be publicly
+    visible.
+    
+    \item \textbf{Geo tagged submissions:} users can upload photographs with
+    geographic coordinates and descriptions.
+    
+    \item \textbf{AI assisted public classification:} public submissions are
+    assigned tags from the approved AI generated tag suggestions.
+    
+    \item \textbf{Community verification:} users can add photographs, confirm
+    whether locations are still available, and report incorrect information.
+    
+    \item \textbf{Conflict handling:} nearby or semantically similar
+    locations will be identified to reduce duplicate entries.
+    
+    \item \textbf{Admin and Moderator dashboard:} administrators can review
+    reports, flagged submissions, conflicts, and moderation activity.
+\end{itemize}
+
+\subsection{Core Workflow}
+
+\begin{enumerate}[leftmargin=0.7cm]
+    \item User signs in to the platform.
+    
+    \item User chooses to browse Public Maps or manage My Maps.
+    
+    \item User creates a location by uploading a photograph, capturing its
+    geographic coordinates, and entering a description.
+    
+    \item User chooses whether the location belongs to a Public Map or a
+    private My Map.
+    
+    \item For Public Maps, AI recommends tags from the approved public
+    taxonomy. The user can select only from these suggested tags.
+    
+    \item For My Maps, the user can define custom tags and descriptions.
+    
+    \item The system checks nearby and similar existing public locations
+    before publishing.
+    
+    \item Public locations can subsequently receive additional photographs,
+    verification updates, reports, and freshness information.
+\end{enumerate}
+
+\subsection{Public and Private Maps}
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item \textbf{Public Maps:} visible to the PinPoint community and subject
+    to AI assisted tagging, moderation, duplicate detection, and community
+    reporting.
+    
+    \item \textbf{My Maps:} private by default and accessible only to the
+    owner or users explicitly granted access.
+    
+    \item Private maps can be shared with selected users through explicit
+    access permissions.
+    
+    \item Private locations will not appear in public map searches or public
+    APIs.
+\end{itemize}
+
+\subsection{Conflict and Duplicate Handling}
+
+When a user attempts to add a public location near an existing location, the
+system will identify possible conflicts rather than automatically creating
+a duplicate.
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item Display nearby or semantically similar existing locations.
+    \item Allow the user to identify whether the location is the same.
+    \item If it is the same, the user can add another photograph or additional
+    information to the existing location.
+    \item If it is different, the user can continue creating a separate
+    location.
+\end{itemize}
+
+\section{Solution Approach%
+  \BvrHint{\ldots Engineering focus}}
+
+This is an engineering focused software project. The primary emphasis will
+be on secure application architecture, geospatial data management, community
+workflows, maintainability, and deployability rather than developing novel
+AI algorithms.
+
+\subsection{System Architecture}
+
+The system will use a layered web architecture:
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item \textbf{Frontend:} React with TypeScript and Tailwind CSS.
+    \item \textbf{Backend:} FastAPI with Python.
+    \item \textbf{Database:} PostgreSQL with PostGIS and pgvector.
+    \item \textbf{Object Storage:} AWS S3 for photographs.
+    \item \textbf{Caching and Background Processing:} Redis and Celery.
+    \item \textbf{Reverse Proxy:} Nginx.
+    \item \textbf{Deployment:} Vercel for the frontend and AWS EC2 with
+    Docker Compose for backend services.
+\end{itemize}
+
+\subsection{Geospatial Management}
+
+Leaflet and OpenStreetMap will provide interactive map functionality.
+Nominatim will be used for geocoding and reverse geocoding.
+
+PostGIS will store geographic coordinates and support proximity queries used
+for location discovery and duplicate and conflict detection.
+
+\subsection{AI Assisted Public Maps}
+
+AI will be used as an assistance and moderation layer.
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item \textbf{Gemini API:} recommends public categories and tags from
+    user provided descriptions.
+    
+    \item \textbf{Sentence Transformers:} generate semantic embeddings for
+    location descriptions and related information.
+    
+    \item \textbf{pgvector:} performs similarity searches for potentially
+    duplicate or conflicting locations.
+    
+    \item AI assisted moderation will identify potentially inappropriate,
+    spam, or suspicious public submissions.
+    
+    \item AI will assist moderation but will not override application rules
+    or administrator decisions.
+\end{itemize}
+
+\subsection{Authentication and Security}
+
+Authentication will be mandatory for all users.
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item JWT and OAuth2 for authentication.
+    \item Argon2id for password hashing.
+    \item Ownership and authorization checks for private maps.
+    \item Explicit sharing permissions for selected users.
+    \item Input validation through Pydantic.
+    \item API rate limiting.
+    \item Secure access to stored photographs through controlled URLs.
+    \item HTTPS and Nginx for secure communication.
+\end{itemize}
+
+\subsection{Testing and Validation}
+
+The system will be validated through multiple levels of testing:
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item \textbf{Unit Testing:} individual backend functions and services
+    using Pytest.
+    
+    \item \textbf{Integration Testing:} API, database, authentication,
+    storage, and background service interactions.
+    
+    \item \textbf{End to End Testing:} complete user workflows using
+    Playwright.
+    
+    \item \textbf{Security Testing:} authentication, authorization, input
+    validation, rate limiting, and dependency and container security checks.
+    
+    \item \textbf{User Acceptance Testing:} testing public and private map
+    workflows, location creation, discovery, verification, and reporting
+    with representative users.
+\end{itemize}
+
+\subsection{CI/CD and Development Workflow}
+
+The project will use Git and GitHub for collaborative development.
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item Feature branches will be used for individual features.
+    \item Pull requests will be used for code review and merging.
+    \item GitHub Actions will automatically run linting, type checking,
+    tests, security checks, and Docker builds.
+    \item Docker and Docker Compose will provide reproducible development and
+    deployment environments.
+    \item Releases will use version tags and semantic versioning.
+\end{itemize}
+
+\section{Evaluation Criterion%
+  \BvrHint{\ldots measurable and attributable}}
+
+The system will be evaluated using metrics connected to the primary workflows.
+
+\subsection{Primary Evaluation Metrics}
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item \textbf{Location creation success rate:} percentage of valid
+    submissions successfully stored and displayed.
+    
+    \item \textbf{Public and private authorization correctness:} percentage
+    of tested private locations that remain inaccessible through unauthorized
+    users and public APIs.
+    
+    \item \textbf{Duplicate detection effectiveness:} percentage of known
+    duplicate or nearby conflicting locations correctly surfaced for review.
+\end{itemize}
+
+\subsection{Secondary Evaluation Metrics}
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item API response time for common map and search operations.
+    \item Successful image upload and retrieval rate.
+    \item Community verification and reporting response rate.
+    \item Freshness of public location information.
+    \item Application availability during the deployment period.
+    \item End to end workflow success rate.
+\end{itemize}
+
+\section{Scalability%
+  \BvrHint{\ldots with foresight}}
+
+The architecture will support growth in users, locations, photographs, and
+concurrent requests.
+
+\begin{enumerate}[leftmargin=0.7cm]
+    \item \textbf{Application scalability:}
+    \begin{itemize}[leftmargin=0.7cm]
+        \item Separate frontend and backend services.
+        \item Stateless FastAPI APIs.
+        \item Redis based caching.
+        \item Celery based asynchronous processing.
+        \item Pagination and indexed database queries.
+        \item Background execution of expensive AI operations.
+    \end{itemize}
+
+    \item \textbf{Infrastructure scalability:}
+    \begin{itemize}[leftmargin=0.7cm]
+        \item Managed PostgreSQL through AWS RDS.
+        \item AWS S3 for scalable photograph storage.
+        \item CloudFront for image delivery and caching.
+        \item Docker based deployment.
+        \item CI/CD for repeatable releases.
+    \end{itemize}
+\end{enumerate}
+
+\section{Engine Availability Heuristic}
+
+The project uses mature and widely adopted technologies:
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item React and TypeScript with Tailwind CSS for frontend development.
+    \item FastAPI and Python for backend APIs.
+    \item PostgreSQL with PostGIS and pgvector for relational, geospatial,
+    and vector data.
+    \item Leaflet and OpenStreetMap for mapping.
+    \item Nominatim for geocoding.
+    \item AWS S3 and CloudFront for image storage and delivery.
+    \item Redis and Celery for caching and background jobs.
+    \item Gemini API and Sentence Transformers for AI functionality.
+    \item Docker and Docker Compose for containerization.
+    \item Pytest and Playwright for automated testing.
+    \item GitHub Actions for CI/CD.
+    \item Sentry and AWS CloudWatch for monitoring.
+\end{itemize}
+
+These technologies allow the team to focus on the application's core
+workflow, security, geospatial functionality, and community features rather
+than building infrastructure from scratch.
+
+\section{Project Scope and Deliverables%
+  \BvrHint{\ldots four month implementation}}
+
+\subsection{Initial Deliverable: Basic}
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item Project setup and Git based development workflow.
+    \item Mandatory user registration and authentication.
+    \item React based map interface.
+    \item Leaflet and OpenStreetMap integration.
+    \item Creation and viewing of geo tagged locations.
+    \item Photograph upload to AWS S3.
+    \item Basic public and private location visibility.
+    \item Creation and management of My Maps.
+    \item PostgreSQL and PostGIS integration.
+\end{itemize}
+
+\subsection{Subsequent Deliverable: Moderate}
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item Public categories and filtering.
+    \item Location search and detail cards.
+    \item Multiple photographs for locations.
+    \item Nearby location and duplicate suggestions.
+    \item Community verification and reporting.
+    \item Location freshness and status tracking.
+    \item Private map sharing with selected users.
+    \item Admin and Moderator dashboard.
+    \item Redis and Celery background processing.
+\end{itemize}
+
+\subsection{Advanced Deliverable}
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item Gemini based public tag recommendation.
+    \item Sentence Transformer embeddings with pgvector.
+    \item AI assisted duplicate and similarity detection.
+    \item AI assisted spam and content moderation.
+    \item Advanced conflict and freshness handling.
+    \item Security hardening and automated security checks.
+    \item Production CI/CD and monitoring.
+\end{itemize}
+
+\subsection{Four Month Timeline}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|p{2.2cm}|p{5.2cm}|p{5.2cm}|}
+\hline
+\textbf{Period} & \textbf{Development Phase} & \textbf{Deliverable} \\
+\hline
+Weeks 1 to 4 &
+Requirements, architecture, database design, project setup, authentication &
+SRS, architecture, repository, basic authentication \\
+\hline
+Weeks 5 to 8 &
+Maps, geolocation, image upload, public and private maps &
+Basic working PinPoint MVP \\
+\hline
+Weeks 9 to 12 &
+Search, filters, conflicts, community verification, freshness, admin dashboard &
+Moderate feature complete system \\
+\hline
+Weeks 13 to 15 &
+AI tagging, embeddings, duplicate detection, moderation &
+Advanced AI assisted functionality \\
+\hline
+Week 16 &
+Testing, security checks, deployment, monitoring, documentation &
+Final release, testing report, presentation \\
+\hline
+\end{tabular}
+\end{center}
+
+\section{Risks and Mitigations}
+
+\begin{itemize}[leftmargin=0.7cm]
+    \item \textbf{Privacy risk:} enforce strict ownership and access control
+    rules for private maps and photographs.
+    
+    \item \textbf{Incorrect AI classification:} public tags will be selected
+    only from approved AI suggested tags and remain subject to moderation.
+    
+    \item \textbf{Duplicate locations:} combine geographic proximity and
+    semantic similarity to identify possible duplicates for user review.
+    
+    \item \textbf{Outdated information:} maintain verification timestamps,
+    status updates, and community reporting.
+    
+    \item \textbf{Spam and inappropriate content:} combine AI assisted
+    moderation, rate limiting, reporting, and administrator review.
+    
+    \item \textbf{Project scope:} implement features in Basic, Moderate, and
+    Advanced stages so that the core system is completed before advanced
+    functionality.
+    
+    \item \textbf{Deployment issues:} use Docker, automated tests, CI/CD,
+    Sentry, and CloudWatch to make deployment repeatable and observable.
+\end{itemize}
+
+\section{Summary}
+
+PinPoint proposes a deployable web platform for capturing and discovering
+local geographic knowledge that is difficult to represent through
+conventional maps. The system combines geo tagged photographs, public
+community maps, private personal maps, geospatial search, community
+verification, freshness tracking, and AI assisted public classification and
+moderation.
+
+The project emphasizes software engineering principles through modular
+architecture, secure authentication and authorization, automated testing,
+containerization, CI/CD, monitoring, and managed cloud infrastructure. The
+four month implementation will progress from a basic mapping system to
+moderate community features and finally advanced AI assisted functionality.
+
+\end{document}
