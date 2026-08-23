@@ -1,34 +1,45 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from database import engine, Base, get_db
-import models
-import schemas
-import crud
-
-Base.metadata.create_all(bind=engine)
+from pydantic import BaseModel
 
 app = FastAPI(title="PinPoint API")
 
-# Add the CORS middleware
+# Add the CORS middleware to allow React to talk to FastAPI
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # This allows requests from your React app
+    allow_origins=["*"], 
     allow_credentials=True,
-    allow_methods=["*"], # Allows all HTTP methods (GET, POST, etc.)
-    allow_headers=["*"], # Allows all headers
+    allow_methods=["*"], 
+    allow_headers=["*"], 
 )
 
-@app.post("/signup", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
-def signup(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = crud.get_user_by_email(db, email=user.email)
-    if db_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Email already registered"
-        )
+# Define what the incoming data should look like
+class UserCreate(BaseModel):
+    email: str
+    password: str
+
+# Mock signup endpoint
+@app.post("/signup", status_code=status.HTTP_201_CREATED)
+def signup(user: UserCreate):
+    # Just to test errors, let's pretend this one email is already taken
+    if user.email == "taken@pinpoint.com":
+        raise HTTPException(status_code=400, detail="Email already registered")
     
-    return crud.create_user(db=db, user=user)
+    # Otherwise, return a fake success message
+    return {"email": user.email, "id": 1, "message": "User created successfully"}
+# Mock login endpoint
+@app.post("/login", status_code=status.HTTP_200_OK)
+def login(user: UserCreate):
+    # Just to test errors, let's pretend this email has the wrong password
+    if user.email == "wrong@pinpoint.com":
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    # Otherwise, return a fake success token
+    return {
+        "message": "Login successful", 
+        "access_token": "fake-super-secret-jwt-token", 
+        "token_type": "bearer"
+    }
 
 @app.get("/")
 def read_root():
