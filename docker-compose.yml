@@ -3,7 +3,11 @@ services:
     build:
       context: ./backend
     ports:
-      - "8000:8000"
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgresql://pinpoint:pinpoint@postgres:5432/pinpoint
+    depends_on:
+      - postgres
 
   frontend:
     build:
@@ -12,6 +16,7 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+
   postgres:
     image: postgres:16
     environment:

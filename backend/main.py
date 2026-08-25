@@ -1,3 +1,9 @@
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from app.db.database import get_db
+from app.models.user import User
+from app.core.security import hash_password
+from app.schemas.user import UserCreate
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -13,20 +19,33 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
-# Define what the incoming data should look like
-class UserCreate(BaseModel):
-    email: str
-    password: str
+
 
 # Mock signup endpoint
 @app.post("/signup", status_code=status.HTTP_201_CREATED)
-def signup(user: UserCreate):
-    # Just to test errors, let's pretend this one email is already taken
-    if user.email == "taken@pinpoint.com":
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Otherwise, return a fake success message
-    return {"email": user.email, "id": 1, "message": "User created successfully"}
+def signup(user: UserCreate, db: Session = Depends(get_db)):
+    existing_user = db.query(User).filter(User.email == user.email).first()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+
+    new_user = User(
+        email=user.email,
+        password_hash=hash_password(user.password)
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {
+        "email": new_user.email,
+        "id": new_user.id,
+        "message": "User created successfully"
+    }
 # Mock login endpoint
 @app.post("/login", status_code=status.HTTP_200_OK)
 def login(user: UserCreate):
