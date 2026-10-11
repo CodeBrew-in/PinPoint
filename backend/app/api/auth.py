@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate
+from app.schemas.user import Token, UserCreate, UserLogin, UserRead
 from app.core.security import (
     hash_password,
     verify_password,
@@ -17,7 +17,7 @@ security = HTTPBearer()
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/signup", status_code=status.HTTP_201_CREATED)
+@router.post("/signup", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def signup(user: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user.email).first()
 
@@ -36,15 +36,11 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    return {
-        "id": new_user.id,
-        "email": new_user.email,
-        "message": "User created successfully",
-    }
+    return new_user
 
 
-@router.post("/login")
-def login(user: UserCreate, db: Session = Depends(get_db)):
+@router.post("/login", response_model=Token)
+def login(user: UserLogin, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user.email).first()
 
     if not existing_user or not verify_password(
@@ -60,13 +56,10 @@ def login(user: UserCreate, db: Session = Depends(get_db)):
         data={"sub": str(existing_user.id)}
     )
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-    }
+    return Token(access_token=access_token)
 
 
-@router.get("/me")
+@router.get("/me", response_model=UserRead)
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
@@ -95,7 +88,4 @@ def get_current_user(
             detail="User not found",
         )
 
-    return {
-        "id": user.id,
-        "email": user.email,
-    }
+    return user
