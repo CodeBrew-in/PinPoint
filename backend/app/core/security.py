@@ -1,12 +1,17 @@
-from datetime import datetime, timedelta
+import os
+from datetime import datetime, timedelta, timezone
 
 import jwt
+from dotenv import load_dotenv
 from pwdlib import PasswordHash
 
 
+load_dotenv()
+
 password_hash = PasswordHash.recommended()
 
-SECRET_KEY = "change-this-to-a-secure-secret-key"
+# Set a long random SECRET_KEY in .env for anything beyond local development
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-insecure-secret-key-change-me-in-env")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -22,7 +27,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict) -> str:
     payload = data.copy()
 
-    expire = datetime.utcnow() + timedelta(
+    expire = datetime.now(timezone.utc) + timedelta(
         minutes=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
@@ -34,7 +39,7 @@ def create_access_token(data: dict) -> str:
         algorithm=ALGORITHM,
     )
 
-def verify_access_token(token: str) -> dict:
+def verify_access_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(
             token,

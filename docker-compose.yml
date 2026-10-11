@@ -6,6 +6,7 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://pinpoint:pinpoint@postgres:5432/pinpoint
+      SECRET_KEY: ${SECRET_KEY:-dev-only-insecure-secret-key-change-me-in-env}
     depends_on:
       postgres:
         condition: service_healthy
