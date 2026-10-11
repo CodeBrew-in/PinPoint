@@ -3,11 +3,12 @@ services:
     build:
       context: ./backend
     ports:
-      - "8001:8000"
+      - "8000:8000"
     environment:
       DATABASE_URL: postgresql://pinpoint:pinpoint@postgres:5432/pinpoint
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   frontend:
     build:
@@ -25,3 +26,8 @@ services:
       POSTGRES_DB: pinpoint
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pinpoint -d pinpoint"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
