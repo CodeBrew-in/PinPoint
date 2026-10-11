@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/api';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
@@ -14,7 +14,7 @@ export default function Signup() {
 
     try {
       // Send the data to the FastAPI backend
-      const response = await axios.post('http://localhost:8000/signup', {
+      const response = await api.post('/auth/signup', {
         email: email,
         password: password
       });

@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import axios from 'axios';
+import { Link, useNavigate } from 'react-router-dom';
+import api from '../lib/api';
 
 export default function Login() {
   // 1. Create state to store what the user types
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   // 2. Create the function that talks to the backend
   const handleLogin = async (e: React.FormEvent) => {
@@ -14,14 +15,15 @@ export default function Login() {
     setError(''); // Clear any old errors
 
     try {
-      const response = await axios.post('http://localhost:8000/login', {
+      const response = await api.post('/auth/login', {
         email,
         password,
       });
 
-      // Show the success message from FastAPI!
-      alert(response.data.message); 
-      
+      // Save the JWT so later requests are sent as this user
+      localStorage.setItem('token', response.data.access_token);
+      navigate('/');
+
     } catch (err: any) {
       console.error("Login failed:", err);
       setError(err.response?.data?.detail || "Invalid email or password");

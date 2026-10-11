@@ -14,7 +14,7 @@ typing_extensions==4.16.0
 uvicorn==0.52.4
 httpx
 SQLAlchemy
-psycopg2-binary
+psycopg[binary]
 alembic
 python-dotenv
 pwdlib[argon2]
