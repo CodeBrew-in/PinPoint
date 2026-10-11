@@ -1,27 +1,29 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import AuthProvider from './auth/AuthProvider'
+import Layout from './components/Layout'
+import ProtectedRoute from './components/ProtectedRoute'
+import Home from './pages/Home'
 import Signup from './pages/Signup'
 import Login from './pages/Login'
-
-function Home() {
-  return (
-    <div className="p-8">
-      <h1 className="text-4xl font-bold text-blue-600 mb-4">PinPoint</h1>
-      <div className="space-x-4">
-        <Link to="/login" className="text-blue-500 underline">Go to Login</Link>
-        <Link to="/signup" className="text-blue-500 underline">Go to Sign Up</Link>
-      </div>
-    </div>
-  )
-}
+import Account from './pages/Account'
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/login" element={<Login />} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/login" element={<Login />} />
+
+            {/* Pages below need a logged-in user */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/account" element={<Account />} />
+            </Route>
+          </Route>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   )
 }
