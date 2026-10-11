@@ -13,7 +13,7 @@ password_hash = PasswordHash.recommended()
 # Set a long random SECRET_KEY in .env for anything beyond local development
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-insecure-secret-key-change-me-in-env")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 
 def hash_password(password: str) -> str:
