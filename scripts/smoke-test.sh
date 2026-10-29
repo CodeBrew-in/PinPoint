@@ -26,8 +26,14 @@ fail() { echo "FAILED: $1" >&2; exit 1; }
 step "Starting the stack"
 docker compose up -d --build --wait
 
-step "Backend health"
-curl -fsS "$API/health" | grep -q '"status":"ok"' || fail "health check"
+step "Backend health (waiting for migrations and startup, up to 90 s)"
+# "docker compose --wait" returns once the containers are running, which can be
+# before the backend has finished its migrations, so keep retrying.
+for _ in $(seq 1 45); do
+  curl -fsS "$API/health" 2>/dev/null | grep -q '"status":"ok"' && break
+  sleep 2
+done
+curl -fsS "$API/health" | grep -q '"status":"ok"' || { docker compose logs backend --tail=40; fail "health check"; }
 
 step "Signup"
 curl -fsS -X POST "$API/auth/signup" -H "Content-Type: application/json" \
