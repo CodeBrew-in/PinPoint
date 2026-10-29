@@ -1,0 +1,4 @@
+# Shell scripts and workflows must keep LF line endings, or they fail on Linux
+*.sh text eol=lf
+*.yml text eol=lf
+Dockerfile* text eol=lf
