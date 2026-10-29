@@ -16,11 +16,11 @@ import {
 } from 'lucide-react';
 
 export const MyMaps: React.FC = () => {
-  const { maps, user, deleteMap, navigateTo, showToast } = useApp();
+  const { maps, user, deleteMap, navigateTo, showToast, isMine } = useApp();
   const [search, setSearch] = useState('');
 
   // User's private maps
-  const userMaps = maps.filter((m) => m.author.id === user?.id);
+  const userMaps = maps.filter((m) => isMine(m.author.id));
 
   const filteredMaps = userMaps.filter((m) => {
     const matchesSearch =

@@ -23,8 +23,8 @@ export const Profile: React.FC = () => {
   const [bio, setBio] = useState(user?.bio || '');
   const [location, setLocation] = useState(user?.location || '');
   const [units, setUnits] = useState<'metric' | 'imperial'>(user?.preferredUnits || 'metric');
-  const [defaultLat, setDefaultLat] = useState(user?.defaultCoordinates?.[0]?.toString() || '30.2672');
-  const [defaultLng, setDefaultLng] = useState(user?.defaultCoordinates?.[1]?.toString() || '-97.7431');
+  const [defaultLat, setDefaultLat] = useState(user?.defaultCoordinates?.[0]?.toString() || '30.3302');
+  const [defaultLng, setDefaultLng] = useState(user?.defaultCoordinates?.[1]?.toString() || '76.4008');
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +34,7 @@ export const Profile: React.FC = () => {
       bio,
       location,
       preferredUnits: units,
-      defaultCoordinates: [parseFloat(defaultLat) || 30.2672, parseFloat(defaultLng) || -97.7431],
+      defaultCoordinates: [parseFloat(defaultLat) || 30.3302, parseFloat(defaultLng) || 76.4008],
     });
   };
 
@@ -150,7 +150,7 @@ export const Profile: React.FC = () => {
               label="Location"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="Austin, TX"
+              placeholder="Patiala, Punjab"
             />
             <Input
               label="Account Email"
@@ -217,12 +217,12 @@ export const Profile: React.FC = () => {
                   <Input
                     value={defaultLat}
                     onChange={(e) => setDefaultLat(e.target.value)}
-                    placeholder="30.2672"
+                    placeholder="30.3302"
                   />
                   <Input
                     value={defaultLng}
                     onChange={(e) => setDefaultLng(e.target.value)}
-                    placeholder="-97.7431"
+                    placeholder="76.4008"
                   />
                 </div>
               </div>

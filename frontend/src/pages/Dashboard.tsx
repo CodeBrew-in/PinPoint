@@ -15,9 +15,9 @@ import {
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
-  const { user, maps, locations, navigateTo } = useApp();
+  const { user, maps, locations, navigateTo, isMine } = useApp();
 
-  const userMaps = maps.filter((m) => m.author.id === user?.id);
+  const userMaps = maps.filter((m) => isMine(m.author.id));
   const recentLocations = locations.slice(0, 3);
 
   return (
