@@ -136,7 +136,7 @@ export const Support: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="Your Name *"
-                  placeholder="e.g. Marcus Vance"
+                  placeholder="e.g. Your full name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required

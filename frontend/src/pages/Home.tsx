@@ -60,7 +60,7 @@ export const Home: React.FC = () => {
             </Button>
 
             <span className="text-xs font-mono text-[#68655F] dark:text-[#9C978D] ml-2 hidden sm:inline">
-              Austin, TX (30.2672° N, 97.7431° W)
+              Patiala, Punjab (30.3302° N, 76.4008° E)
             </span>
           </div>
         </div>
