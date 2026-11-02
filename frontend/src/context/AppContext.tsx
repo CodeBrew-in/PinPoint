@@ -46,6 +46,12 @@ const pathForScreen = (screen: AppScreen, mapId: string, locationId: string | nu
 
 // Name and handle are not stored by the backend yet, so keep them in the browser per user.
 const PROFILE_KEY = (id: number) => `pinpoint_profile_${id}`;
+
+// The demo maps and places are owned by this placeholder id. Until the backend returns real
+// owners, whoever is logged in counts as that owner, so "My Maps" is not empty.
+const MOCK_OWNER_ID = currentUserMock.id;
+const ownedByUser = (authorId: string, userId: number) =>
+  authorId === String(userId) || authorId === MOCK_OWNER_ID;
 const readProfile = (id: number): Partial<UserProfile> => {
   try {
     return JSON.parse(localStorage.getItem(PROFILE_KEY(id)) || '{}');
@@ -69,7 +75,8 @@ interface AppContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
   logout: () => void;
-  saveProfileDetails: (details: { name: string; handle: string }) => void;
+  saveProfileDetails: (details: { name: string; handle: string }, userId: number) => void;
+  isMine: (authorId: string) => boolean;
   currentScreen: AppScreen;
   navigateTo: (screen: AppScreen, params?: NavigationParams) => void;
   currentMapId: string;
@@ -133,8 +140,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isAuthenticated = auth.status === 'authenticated';
   const currentScreen = useMemo(() => screenFromPath(pathname), [pathname]);
   const [profileEdits, setProfileEdits] = useState<Partial<UserProfile>>({});
-  const [currentMapId, setCurrentMapId] = useState<string>('map_photography_spots');
-  const [currentLocationId, setCurrentLocationId] = useState<string | null>('loc_railway_bridge');
+  const [currentMapId, setCurrentMapId] = useState<string>(initialMaps[0]?.id ?? PUBLIC_MAP_ID);
+  const [currentLocationId, setCurrentLocationId] = useState<string | null>(
+    initialLocations.find((l) => l.mapId === initialMaps[0]?.id)?.id ?? null,
+  );
   const [maps, setMaps] = useState<MapCollection[]>(initialMaps);
   const [locations, setLocations] = useState<LocationItem[]>(initialLocations);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -165,10 +174,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       location: '',
       joinedDate: auth.user.created_at ?? currentUserMock.joinedDate,
       stats: {
-        mapsCreated: maps.filter((m) => m.author.id === String(auth.user!.id)).length,
-        locationsPinned: locations.filter((l) => l.author.id === String(auth.user!.id)).length,
+        mapsCreated: maps.filter((m) => ownedByUser(m.author.id, auth.user!.id)).length,
+        locationsPinned: locations.filter((l) => ownedByUser(l.author.id, auth.user!.id)).length,
         photosAttached: locations
-          .filter((l) => l.author.id === String(auth.user!.id))
+          .filter((l) => ownedByUser(l.author.id, auth.user!.id))
           .reduce((n, l) => n + l.photos.length, 0),
         contributionsVerified: 0,
       },
@@ -179,6 +188,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     setProfileEdits(auth.user ? readProfile(auth.user.id) : {});
   }, [auth.user]);
+
+  // Demo maps and places are owned by a placeholder author. Show them as owned by the logged-in
+  // user (and reset them on logout). This goes away once the backend returns real owners.
+  const userId = user?.id;
+  const userName = user?.name;
+  useEffect(() => {
+    if (!userId || !userName) {
+      setMaps(initialMaps);
+      setLocations(initialLocations);
+      return;
+    }
+    const asUser = <T extends { author: { id: string; name: string } }>(item: T): T =>
+      item.author.id === MOCK_OWNER_ID || item.author.id === userId
+        ? { ...item, author: { ...item.author, id: userId, name: userName } }
+        : item;
+    setMaps((prev) => prev.map(asUser));
+    setLocations((prev) => prev.map(asUser));
+  }, [userId, userName]);
 
   // Keep the selected map / location in step with the URL (refresh, back, shared links)
   useEffect(() => {
@@ -237,13 +264,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Signed out of PinPoint', 'info');
   };
 
-  const saveProfileDetails = (details: { name: string; handle: string }) => {
-    if (!auth.user) return;
+  const saveProfileDetails = (details: { name: string; handle: string }, userId: number) => {
     const handle = details.handle.startsWith('@') ? details.handle : `@${details.handle}`;
-    const edits = { name: details.name, handle };
-    localStorage.setItem(PROFILE_KEY(auth.user.id), JSON.stringify(edits));
-    setProfileEdits(edits);
+    localStorage.setItem(PROFILE_KEY(userId), JSON.stringify({ name: details.name, handle }));
   };
+
+  const isMine = (authorId: string) => !!auth.user && ownedByUser(authorId, auth.user.id);
 
   const publicLocations = locations.filter((l) => l.mapId === PUBLIC_MAP_ID || l.isPublic);
 
@@ -257,7 +283,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     createdAt: '2025-01-01T00:00:00Z',
     updatedAt: new Date().toISOString(),
     locationCount: publicLocations.length,
-    center: [30.2672, -97.7431],
+    center: [30.3302, 76.4008],
     zoom: 13,
     author: {
       id: 'pinpoint_community',
@@ -300,7 +326,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       locationCount: 0,
-      center: mapData.center || [30.2672, -97.7431],
+      center: mapData.center || [30.3302, 76.4008],
       zoom: mapData.zoom || 13,
       author: {
         id: user?.id || 'usr_guest',
@@ -453,10 +479,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         },
         (err) => {
           console.warn('Geolocation error:', err.message);
-          // Fallback to default Austin coordinates for demo
-          const fallback = { lat: 30.2672, lng: -97.7431 };
+          // Fall back to the centre of Patiala when the browser cannot give a location
+          const fallback = { lat: 30.3302, lng: 76.4008 };
           setUserCoords(fallback);
-          showToast('Using local spatial reference (Austin, TX)', 'info');
+          showToast('Using Patiala city centre as your location', 'info');
           resolve(fallback);
         },
         { timeout: 8000, enableHighAccuracy: true }
@@ -471,6 +497,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthenticated,
         logout,
         saveProfileDetails,
+        isMine,
         currentScreen,
         navigateTo,
         currentMapId,

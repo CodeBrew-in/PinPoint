@@ -48,8 +48,8 @@ export const CreateMap: React.FC = () => {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<Category>('Photography');
   const [coverImage, setCoverImage] = useState(SAMPLE_COVERS[0].url);
-  const [lat, setLat] = useState('30.2672');
-  const [lng, setLng] = useState('-97.7431');
+  const [lat, setLat] = useState('30.3302');
+  const [lng, setLng] = useState('76.4008');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +64,7 @@ export const CreateMap: React.FC = () => {
       category,
       isPublic: false,
       coverImage,
-      center: [parseFloat(lat) || 30.2672, parseFloat(lng) || -97.7431],
+      center: [parseFloat(lat) || 30.3302, parseFloat(lng) || 76.4008],
       zoom: 13,
     });
 
@@ -188,14 +188,14 @@ export const CreateMap: React.FC = () => {
                   label="Latitude"
                   value={lat}
                   onChange={(e) => setLat(e.target.value)}
-                  placeholder="30.2672"
+                  placeholder="30.3302"
                   required
                 />
                 <Input
                   label="Longitude"
                   value={lng}
                   onChange={(e) => setLng(e.target.value)}
-                  placeholder="-97.7431"
+                  placeholder="76.4008"
                   required
                 />
               </div>

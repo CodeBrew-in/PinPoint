@@ -27,10 +27,14 @@ export const SignUp: React.FC = () => {
     }
     setSubmitting(true);
     try {
-      await api.post('/auth/signup', { email, password });
+      const created = await api.post('/auth/signup', { email, password });
+      // The backend only stores email and password for now, so name and handle stay in this browser.
+      // Save them before logging in, so the profile is already there when the app loads the user.
+      saveProfileDetails(
+        { name, handle: handle || `@${name.toLowerCase().replace(/\s+/g, '')}` },
+        created.data.id,
+      );
       await auth.login(email, password);
-      // The backend only stores email and password for now, so name and handle stay in this browser
-      saveProfileDetails({ name, handle: handle || `@${name.toLowerCase().replace(/\s+/g, '')}` });
       showToast(`Welcome to PinPoint, ${name}!`, 'success');
       navigateTo('dashboard');
     } catch (err) {
@@ -58,7 +62,7 @@ export const SignUp: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Full Name *"
-            placeholder="Marcus Vance"
+            placeholder="Your full name"
             value={name}
             onChange={(e) => {
               setName(e.target.value);
@@ -81,7 +85,7 @@ export const SignUp: React.FC = () => {
           <Input
             label="Email Address *"
             type="email"
-            placeholder="m.vance@studiofield.org"
+            placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required

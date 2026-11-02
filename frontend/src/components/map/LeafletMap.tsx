@@ -30,7 +30,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   onSelectLocation,
   interactivePicker = false,
   onPickCoordinates,
-  center = [30.2672, -97.7431],
+  center = [30.3302, 76.4008],
   zoom = 13,
   height = '100%',
   className = '',
