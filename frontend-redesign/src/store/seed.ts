@@ -8,11 +8,13 @@ import type { MapData, Place, Report, State, User } from './types';
  * Place names and coordinates are real Patiala locations taken from OpenStreetMap.
  * Descriptions are deliberately plain. Replace them (and add photos) with your own.
  */
-const PASS_HASH = '583e058ef1aa5ca952da97e6091e0d8c1fda04aa055cb0d31fe15618aff79fc4';
+// PBKDF2-SHA256, 600,000 iterations, fixed public demo salts. Both accounts use the password above.
+const MARCUS_HASH = 'pbkdf2-sha256$600000$F/l4EJLCz8qq0PolkdehjQ==$mcU8GSRbD7P8UxF2caJh1nLSjLS3t3TORxMxd4o3HLI=';
+const ANANYA_HASH = 'pbkdf2-sha256$600000$IlitBiS2U5z5H1BLhzBt4A==$xglMj/VPKgaMbdjHASMR/dl2gkqOiIiqr0JxJpJ0FYM=';
 
 const users: User[] = [
-  { id: 'u-marcus', username: 'marcus', name: 'Marcus Vance', email: 'marcus@example.com', passHash: PASS_HASH, bio: 'Demo moderator account.', role: 'moderator' },
-  { id: 'u-ananya', username: 'ananya', name: 'Ananya Rao', email: 'ananya@example.com', passHash: PASS_HASH, bio: 'Demo member account.', role: 'member' },
+  { id: 'u-marcus', username: 'marcus', name: 'Marcus Vance', email: 'marcus@example.com', passHash: MARCUS_HASH, bio: 'Demo moderator account.', role: 'moderator' },
+  { id: 'u-ananya', username: 'ananya', name: 'Ananya Rao', email: 'ananya@example.com', passHash: ANANYA_HASH, bio: 'Demo member account.', role: 'member' },
 ];
 
 const place = (

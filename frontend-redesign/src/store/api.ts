@@ -1,5 +1,6 @@
 import { canView, sessionUser } from './helpers';
 import { passwordError } from './password';
+import { hashPassword, verifyAgainstDecoy, verifyPassword } from './passwordHash';
 import { commit, getState } from './store';
 import type { MapData, Place, ReportKind, State, User, Visibility } from './types';
 
@@ -9,12 +10,8 @@ import type { MapData, Place, ReportKind, State, User, Visibility } from './type
  */
 
 const today = () => new Date().toISOString().slice(0, 10);
-const rand = () => Math.random().toString(36).slice(2, 7);
-
-async function sha256(text: string) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
+// Random ids from the browser's secure generator (these show up in URLs and as user ids).
+const rand = () => [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(36).padStart(2, '0')).join('').slice(0, 6);
 
 function requireUser(s: State): User {
   const u = sessionUser(s);
@@ -50,7 +47,7 @@ export async function signUp(input: { username: string; email: string; password:
   if (pwError) throw new Error(pwError);
   if (s.users.some((u) => u.email === email)) throw new Error('An account with this email already exists.');
   if (s.users.some((u) => u.username.toLowerCase() === username.toLowerCase())) throw new Error('That username is taken.');
-  const user: User = { id: `u-${rand()}`, username, name: username, email, passHash: await sha256(input.password), bio: '', role: 'member' };
+  const user: User = { id: `u-${rand()}`, username, name: username, email, passHash: await hashPassword(input.password), bio: '', role: 'member' };
   commit({ ...getState(), users: [...getState().users, user], sessionUserId: user.id });
 }
 
@@ -58,7 +55,11 @@ export async function signIn(emailRaw: string, password: string) {
   const email = emailRaw.trim().toLowerCase();
   const user = getState().users.find((u) => u.email === email);
   // Same message for unknown email and wrong password.
-  if (!user || user.passHash !== (await sha256(password))) throw new Error('Email or password is not correct.');
+  if (!user) {
+    await verifyAgainstDecoy(password); // keep the timing the same as a wrong password
+    throw new Error('Email or password is not correct.');
+  }
+  if (!(await verifyPassword(password, user.passHash))) throw new Error('Email or password is not correct.');
   commit({ ...getState(), sessionUserId: user.id });
 }
 
@@ -84,10 +85,10 @@ export function updateProfile(input: { name: string; email: string; bio: string 
 export async function changePassword(current: string, next: string) {
   const s = getState();
   const me = requireUser(s);
-  if (me.passHash !== (await sha256(current))) throw new Error('Current password is not correct.');
+  if (!(await verifyPassword(current, me.passHash))) throw new Error('Current password is not correct.');
   const pwError = passwordError(next, { username: me.username, email: me.email });
   if (pwError) throw new Error(pwError);
-  const passHash = await sha256(next);
+  const passHash = await hashPassword(next);
   commit({ ...getState(), users: getState().users.map((u) => (u.id === me.id ? { ...u, passHash } : u)) });
 }
 

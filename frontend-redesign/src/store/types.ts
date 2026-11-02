@@ -6,7 +6,7 @@ export interface User {
   username: string;
   name: string;
   email: string;
-  /** SHA-256 hex. Demo only: the real backend uses Argon2id (see proposal). */
+  /** Salted PBKDF2-SHA256 (see passwordHash.ts). Demo only: the real backend uses Argon2id (see proposal). */
   passHash: string;
   bio: string;
   role: Role;

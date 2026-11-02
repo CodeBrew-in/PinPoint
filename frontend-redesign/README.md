@@ -27,6 +27,6 @@ There is no backend yet. All data lives in this browser's `localStorage` (key `p
 
 ## What is real and what is not
 
-Real in the browser: accounts (SHA-256 hashed, demo only), mandatory sign-in, public/private access, creating maps, adding places with resized photos, EXIF location, duplicate check and merge, verify, report, moderator queue, sharing private maps by email.
+Real in the browser: accounts (salted PBKDF2 password hashes, demo only), public browsing without an account (sign-in needed to change anything), public/private access, creating maps, adding places with resized photos, EXIF location, duplicate check and merge, verify, report, moderator queue, sharing private maps by email.
 
 Not real: server, Argon2id/JWT auth, AI tagging (keyword rules), pgvector similarity (name + distance rules), email invites (access is by matching email), cross-device sync.

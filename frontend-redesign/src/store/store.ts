@@ -3,7 +3,7 @@ import { seedState } from './seed';
 import type { State } from './types';
 
 // Bump the version when the seed data changes, so old browser data does not hide it.
-const KEY = 'pinpoint.state.v2';
+const KEY = 'pinpoint.state.v3';
 
 function load(): State {
   try {
