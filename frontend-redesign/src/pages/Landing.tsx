@@ -5,6 +5,8 @@ import { useSession } from '../components/Layout';
 import { MapCardLink } from '../components/MapCardLink';
 import { LANDS, MapTile } from '../components/MapTile';
 import { publicMaps, toCard } from '../store/helpers';
+import { loadPublicMaps } from '../store/remote';
+import { useLoad } from '../store/useLoad';
 import { useAppState } from '../store/store';
 
 const faqs = [
@@ -34,6 +36,7 @@ const Watermark = ({ className = '' }: { className?: string }) => (
 export default function Landing() {
   const state = useAppState();
   const user = useSession();
+  useLoad(loadPublicMaps, []); // a failure just leaves the sample list empty
   // The three biggest public maps; their real places drive the pins drawn on each tile.
   const maps = publicMaps(state)
     .map((m) => toCard(state, m))

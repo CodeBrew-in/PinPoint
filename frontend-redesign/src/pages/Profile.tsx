@@ -6,6 +6,7 @@ import { Input } from '../components/Input';
 import { useSession } from '../components/Layout';
 import { PasswordField } from '../components/PasswordField';
 import { changePassword, updateProfile } from '../store/api';
+import { USE_API } from '../lib/http';
 import { resetDemoData } from '../store/store';
 
 export default function Profile() {
@@ -30,10 +31,10 @@ export default function Profile() {
 
       <form
         className="mt-6 flex flex-col gap-4"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           try {
-            updateProfile({ name, email, bio });
+            await updateProfile({ name, email, bio });
             setProfileMsg({ ok: true, text: 'Saved.' });
           } catch (err) {
             setProfileMsg({ ok: false, text: err instanceof Error ? err.message : 'Could not save.' });
@@ -43,7 +44,7 @@ export default function Profile() {
         <FieldCard className="flex flex-col gap-4">
           <h2 className="text-2xl">Your details</h2>
           <Input label="Name" value={name} onChange={(e) => { setName(e.target.value); setProfileMsg(null); }} />
-          <Input label="Email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setProfileMsg(null); }} />
+          <Input label="Email" type="email" disabled={USE_API} value={email} onChange={(e) => { setEmail(e.target.value); setProfileMsg(null); }} />
           <label className="block">
             <span className="label mb-1 block">About you</span>
             <textarea
@@ -65,7 +66,7 @@ export default function Profile() {
       </form>
 
       <form
-        className="mt-6"
+        className={USE_API ? 'hidden' : 'mt-6'} // the server has no change-password endpoint yet
         onSubmit={async (e) => {
           e.preventDefault();
           try {
@@ -94,7 +95,7 @@ export default function Profile() {
         </FieldCard>
       </form>
 
-      <div className="mt-10 border-t-2 border-ink pt-4">
+      <div className={USE_API ? 'hidden' : 'mt-10 border-t-2 border-ink pt-4'}>
         <p className="label">Demo data</p>
         <p className="mt-1 text-sm">Everything is saved only in this browser. Resetting restores the sample maps and signs you out.</p>
         <Button

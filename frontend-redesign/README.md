@@ -1,32 +1,64 @@
 # PinPoint frontend redesign
 
-> This is a separate, standalone take on the frontend (new look, mock data in the browser). It does **not** replace or change `../frontend`, which is the version wired to the backend. It does not call the API: all data lives in `localStorage` behind `src/store/api.ts`, whose functions are shaped to map onto the planned endpoints.
+A separate take on the frontend (new look). It does **not** replace `../frontend`; both can run side by side.
+It works in two modes, chosen by one setting:
+
+| Mode | How | Data |
+|---|---|---|
+| **Backend** | `VITE_API_URL` is set | Accounts, maps, places, photos, verify, reports and moderation use the real API (`docs/api-contract.md`, version 2). |
+| **Browser demo** | `VITE_API_URL` is empty | No backend needed. Everything lives in this browser's `localStorage`, with Patiala sample data. This is what the shared Vercel link runs. |
 
 React + TypeScript + Tailwind + Leaflet. Colors, fonts and shadows are defined in `tailwind.config.js`. Wording rules are in `./GLOSSARY_AND_SCREENS.md`.
 
+## Run with the backend (Docker)
+
+From the repository root:
+
 ```bash
-npm install
-npm run dev
+docker compose -f docker-compose.yml -f docker-compose.redesign.yml up --build
 ```
 
-## How data works today
+Then load the demo data once, and open http://localhost:5174:
 
-There is no backend yet. All data lives in this browser's `localStorage` (key `pinpoint.state.v1`) behind `src/store/api.ts`. Each function in that file is meant to become one FastAPI endpoint; pages only talk to `api.ts` and the `useAppState()` hook.
+```bash
+docker compose -f docker-compose.yml -f docker-compose.redesign.yml exec backend python -m app.seed
+```
 
-- `src/store/seed.ts`: sample users, maps, places and reports.
-- `src/store/api.ts`: sign up / in, maps, places, photos, verify, report, share, moderation.
-- `src/store/helpers.ts`: access rule (`canView`), duplicate check and tag suggestions (stand-ins for PostGIS/pgvector and Gemini).
-- Profile page → "Reset demo data" restores the seed.
+Demo accounts (password `demo-password-1`): `marcus@example.com` (moderator, sees the Review page) and `ananya@example.com`.
+Anyone can also create an account on the sign-up page.
 
-## Demo accounts (seed data only)
+## Run without Docker
 
-| Email | Password | Role |
-|---|---|---|
-| marcus@example.com | demo-password-1 | moderator |
-| ananya@example.com | demo-password-1 | member |
+```bash
+npm install
+npm run dev                                  # browser demo, nothing else needed
+```
 
-## What is real and what is not
+To use a backend you started yourself, copy `.env.example` to `.env` (it points at `http://localhost:8000/api/v1`)
+and start `npm run dev` again. The backend must allow this origin in `FRONTEND_ORIGINS` (default `http://localhost:5173`).
 
-Real in the browser: accounts (salted PBKDF2 password hashes, demo only), public browsing without an account (sign-in needed to change anything), public/private access, creating maps, adding places with resized photos, EXIF location, duplicate check and merge, verify, report, moderator queue, sharing private maps by email.
+## How it is built
 
-Not real: server, Argon2id/JWT auth, AI tagging (keyword rules), pgvector similarity (name + distance rules), email invites (access is by matching email), cross-device sync.
+Pages never call the network. They read from one store and call functions in `src/store/api.ts`.
+
+- `src/store/api.ts`: every action (sign in, create map, add place, and so on). In backend mode each one calls `src/store/remote.ts`; otherwise it works on `localStorage`.
+- `src/store/remote.ts`: the backend calls. The store acts as a cache: pages load what they need, and every change goes to the server first and then refreshes that part of the cache.
+- `src/lib/http.ts`: `fetch` wrapper, the saved login token, and `VITE_API_URL`.
+- `src/store/useLoad.ts`: runs a loader when a page opens and reports loading or error.
+- `src/store/seed.ts`: the browser demo's sample data.
+- `src/store/helpers.ts`: tag suggestions and the "is this a duplicate?" check. These still run in the browser in both modes.
+
+## What the backend does not do yet
+
+Shown differently in backend mode:
+
+- **Change password and change email:** the server has no endpoints for them, so those fields are hidden or disabled.
+- **"Reset demo data"** is hidden (there is nothing local to reset).
+- **Tag suggestions and the duplicate check** are still simple browser rules (keywords, name and distance), not AI or PostGIS.
+- **Password reset ("Forgot password?")** does not exist yet.
+- **Email invites:** sharing a private map by email gives access to whoever signs up with that address; no email is sent.
+
+## Browser demo notes
+
+Demo accounts (seed data only): `marcus@example.com` (moderator) and `ananya@example.com`, password `demo-password-1`.
+Passwords there are stored as salted PBKDF2 hashes in `localStorage`, which is only fine for a demo.

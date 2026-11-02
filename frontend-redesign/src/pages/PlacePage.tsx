@@ -9,6 +9,9 @@ import { addPhoto, fileToDataUrl, reportPlace, verifyPlace } from '../store/api'
 import { findMap } from '../store/helpers';
 import { useAppState } from '../store/store';
 import { REPORT_KINDS, type ReportKind } from '../store/types';
+import { LoadError, Loading } from '../components/PageState';
+import { loadMap } from '../store/remote';
+import { useLoad } from '../store/useLoad';
 import NotFound from './NotFound';
 
 export default function PlacePage() {
@@ -20,6 +23,7 @@ export default function PlacePage() {
   const state = useAppState();
   const map = findMap(state, id);
   const place = map?.places.find((p) => String(p.id) === placeId);
+  const load = useLoad(() => loadMap(id ?? ''), [id], Boolean(map?.loaded));
 
   const [reporting, setReporting] = useState(params.get('report') === '1');
   const [kind, setKind] = useState<ReportKind>(REPORT_KINDS[0]);
@@ -27,15 +31,17 @@ export default function PlacePage() {
   const [reported, setReported] = useState(false);
   const [error, setError] = useState('');
 
-  if (!map || !place) return <NotFound />;
+  if (load.status === 'loading') return <Loading label="Loading place…" />;
+  if (load.status === 'error') return <LoadError message={load.error} />;
+  if (!map || !place || load.result === 'missing') return <NotFound />;
 
   // Anyone can look at a public place. Confirming, adding photos or reporting needs an account.
   const needLogin = () => navigate('/signin', { state: { from: location.pathname + location.search } });
 
-  const run = (fn: () => void) => {
+  const run = async (fn: () => void | Promise<void>) => {
     if (!user) return needLogin();
     try {
-      fn();
+      await fn();
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
@@ -46,7 +52,7 @@ export default function PlacePage() {
     if (!file) return;
     if (!user) return needLogin();
     try {
-      addPhoto(map.id, place.id, await fileToDataUrl(file));
+      await addPhoto(map.id, place.id, await fileToDataUrl(file));
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not add the photo.');
@@ -123,7 +129,7 @@ export default function PlacePage() {
                 <Button
                   variant="primary"
                   className="text-base"
-                  onClick={() => run(() => { reportPlace(map.id, place.id, kind, note); setReported(true); })}
+                  onClick={() => run(async () => { await reportPlace(map.id, place.id, kind, note); setReported(true); })}
                 >
                   Send report
                 </Button>

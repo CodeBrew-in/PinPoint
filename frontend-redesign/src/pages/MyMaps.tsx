@@ -6,16 +6,29 @@ import { FieldCard } from '../components/FieldCard';
 import { Input } from '../components/Input';
 import { useSession } from '../components/Layout';
 import { shareMap, unshareMap } from '../store/api';
+import { LoadError, Loading } from '../components/PageState';
+import { placeCountOf } from '../store/helpers';
+import { loadMyMaps } from '../store/remote';
 import { useAppState } from '../store/store';
+import { useLoad } from '../store/useLoad';
 import type { MapData } from '../store/types';
 
 function ShareDialog({ map, onClose }: { map: MapData; onClose: () => void }) {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
 
-  const invite = () => {
+  const remove = async (address: string) => {
     try {
-      shareMap(map.id, email);
+      await unshareMap(map.id, address);
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove access.');
+    }
+  };
+
+  const invite = async () => {
+    try {
+      await shareMap(map.id, email);
       setEmail('');
       setError('');
     } catch (e) {
@@ -30,9 +43,9 @@ function ShareDialog({ map, onClose }: { map: MapData; onClose: () => void }) {
         <p className="mt-1 text-sm">{map.title}. Only people you add can see this private map.</p>
         <div className="mt-4 flex items-end gap-2">
           <div className="flex-1">
-            <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && invite()} />
+            <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void invite()} />
           </div>
-          <Button type="button" onClick={invite}>Invite</Button>
+          <Button type="button" onClick={() => void invite()}>Invite</Button>
         </div>
         {error && <p role="alert" className="mt-2 text-sm font-bold text-danger">{error}</p>}
         <p className="label mt-4">People with access</p>
@@ -43,7 +56,7 @@ function ShareDialog({ map, onClose }: { map: MapData; onClose: () => void }) {
             {map.sharedWith.map((e) => (
               <li key={e} className="flex items-center justify-between gap-2 text-sm">
                 {e}
-                <Button variant="ghost" className="px-2 py-0.5 text-sm" onClick={() => unshareMap(map.id, e)}>
+                <Button variant="ghost" className="px-2 py-0.5 text-sm" onClick={() => void remove(e)}>
                   Remove
                 </Button>
               </li>
@@ -61,10 +74,14 @@ export default function MyMaps() {
   const user = useSession();
   const [tab, setTab] = useState<'mine' | 'shared'>('mine');
   const [sharing, setSharing] = useState<string | null>(null);
+  const load = useLoad(loadMyMaps, [user?.id]);
 
   if (!user) return null;
+  if (load.status === 'loading') return <Loading label="Loading your maps…" />;
+  if (load.status === 'error') return <LoadError message={load.error} />;
   const mine = state.maps.filter((m) => m.ownerId === user.id);
-  const shared = state.maps.filter((m) => m.ownerId !== user.id && m.visibility === 'private' && m.sharedWith.includes(user.email));
+  // In API mode the server says which private maps are shared with me (it hides who else they are shared with).
+  const shared = state.maps.filter((m) => m.ownerId !== user.id && (m.sharedWithMe || (m.visibility === 'private' && m.sharedWith.includes(user.email))));
   const shown = tab === 'mine' ? mine : shared;
   const sharingMap = state.maps.find((m) => m.id === sharing);
   const ownerOf = (m: MapData) => state.users.find((u) => u.id === m.ownerId)?.name ?? 'Unknown';
@@ -104,7 +121,7 @@ export default function MyMaps() {
                   {m.title}
                 </Link>
                 <span className="label mt-2 flex-1">
-                  {m.places.length} places{tab === 'shared' ? ` · by ${ownerOf(m)}` : ''}
+                  {placeCountOf(m)} places{tab === 'shared' ? ` · by ${ownerOf(m)}` : ''}
                 </span>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link to={`/map/${m.id}`}><Button className="text-base">Open</Button></Link>

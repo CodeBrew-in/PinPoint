@@ -26,10 +26,10 @@ export default function CreateMap() {
 
       <form
         className="mt-6 flex flex-col gap-5"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           try {
-            const id = createMap({ title, description, category, visibility });
+            const id = await createMap({ title, description, category, visibility });
             navigate(`/map/${id}`);
           } catch (err) {
             setError(err instanceof Error ? err.message : 'Could not create the map.');

@@ -21,3 +21,4 @@ pwdlib[argon2]
 pydantic[email]
 email-validator
 PyJWT
+python-multipart

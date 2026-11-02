@@ -41,6 +41,16 @@ export interface MapData {
   created: string;
   updated: string;
   places: Place[];
+  /* The fields below are only set in API mode, where lists arrive before the places do. */
+  /** Number of places, from the server (the list view does not load every place). */
+  placeCount?: number;
+  contributorCount?: number;
+  /** A few pins to draw the map card with. */
+  pinsPreview?: { lat: number; lng: number; name: string }[];
+  /** True once every place of this map has been fetched. */
+  loaded?: boolean;
+  /** True for a private map somebody else shared with me (the server does not list who it is shared with). */
+  sharedWithMe?: boolean;
 }
 
 export const REPORT_KINDS = [

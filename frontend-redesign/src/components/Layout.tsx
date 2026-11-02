@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { signOut } from '../store/api';
 import { sessionUser } from '../store/helpers';
-import { useAppState } from '../store/store';
+import { useAppState, useAuthReady } from '../store/store';
 import { Wordmark } from './Art';
+import { Loading } from './PageState';
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `text-sm font-medium hover:underline ${isActive ? 'underline decoration-orange decoration-2 underline-offset-8' : ''}`;
@@ -15,7 +16,9 @@ export function useSession() {
 /** Pages that need an account. Sends visitors to sign in, then back. */
 export function RequireAuth() {
   const user = useSession();
+  const ready = useAuthReady();
   const location = useLocation();
+  if (!ready) return <Loading />;
   if (!user) return <Navigate to="/signin" state={{ from: location.pathname }} replace />;
   return <Outlet />;
 }

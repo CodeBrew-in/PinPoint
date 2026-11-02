@@ -14,6 +14,9 @@ import { verifyPlace } from '../store/api';
 import { contributorCount, findMap, fmtCoords, ownerName } from '../store/helpers';
 import { useAppState } from '../store/store';
 import type { MapData, Place } from '../store/types';
+import { LoadError, Loading } from '../components/PageState';
+import { loadMap } from '../store/remote';
+import { useLoad } from '../store/useLoad';
 import NotFound from './NotFound';
 
 /** Fits all places on first render, then flies to the selected place. */
@@ -44,7 +47,10 @@ export default function MapView() {
   const { id } = useParams();
   const state = useAppState();
   const map = findMap(state, id);
-  if (!map) return <NotFound />;
+  const load = useLoad(() => loadMap(id ?? ''), [id], Boolean(map?.loaded));
+  if (load.status === 'loading') return <Loading label="Loading map…" />;
+  if (load.status === 'error') return <LoadError message={load.error} />;
+  if (!map || load.result === 'missing') return <NotFound />;
   return <MapViewInner key={map.id} map={map} owner={ownerName(state, map)} contributors={contributorCount(state, map)} />;
 }
 
@@ -185,11 +191,11 @@ function MapWithPlaces({ map, owner, contributors }: { map: MapData; owner: stri
                 <Button
                   variant="primary"
                   className="text-base"
-                  onClick={() => {
+                  onClick={async () => {
                     // Browsing is open to everyone; confirming a place needs an account.
                     if (!user) return navigate('/signin', { state: { from: `/map/${id}` } });
                     try {
-                      verifyPlace(id, active.id);
+                      await verifyPlace(id, active.id);
                       setError('');
                     } catch (e) {
                       setError(e instanceof Error ? e.message : 'Could not verify.');

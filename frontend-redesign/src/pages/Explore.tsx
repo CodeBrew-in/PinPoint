@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react';
 import { Chip } from '../components/Chip';
 import { Input } from '../components/Input';
 import { MapCardLink } from '../components/MapCardLink';
+import { LoadError, Loading } from '../components/PageState';
 import { publicMaps, toCard } from '../store/helpers';
+import { loadPublicMaps } from '../store/remote';
+import { useLoad } from '../store/useLoad';
 import { useAppState } from '../store/store';
 
 type Sort = 'recent' | 'places';
@@ -14,6 +17,7 @@ const sorts: { id: Sort; label: string }[] = [
 
 export default function Explore() {
   const state = useAppState();
+  const load = useLoad(loadPublicMaps, [], publicMaps(state).length > 0);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>('recent');
@@ -28,6 +32,9 @@ export default function Explore() {
       .filter((m) => !q || `${m.title} ${m.blurb} ${m.category}`.toLowerCase().includes(q))
       .sort((a, b) => (sort === 'places' ? b.places - a.places : b.updated.localeCompare(a.updated)));
   }, [allMaps, query, category, sort]);
+
+  if (load.status === 'loading') return <Loading label="Loading maps…" />;
+  if (load.status === 'error' && allMaps.length === 0) return <LoadError message={load.error} />;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 md:px-10">
