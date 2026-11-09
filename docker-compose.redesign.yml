@@ -1,0 +1,31 @@
+# Runs the redesigned frontend (frontend-redesign/) together with the backend.
+# It is an add-on to docker-compose.yml, so the original setup is not changed.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.redesign.yml up --build
+#
+# Then open http://localhost:5174 and, once, load the demo data:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.redesign.yml exec backend python -m app.seed
+#
+# Demo accounts (password demo-password-1): marcus@example.com (moderator) and ananya@example.com.
+# This also starts the original frontend on http://localhost:5173; ignore it, or start only what you need:
+#   docker compose -f docker-compose.yml -f docker-compose.redesign.yml up --build postgres backend frontend-redesign
+
+services:
+  backend:
+    environment:
+      # The browser calls the API from these two addresses
+      FRONTEND_ORIGINS: http://localhost:5173,http://localhost:5174
+      # Who gets the moderator role (the Review page). Demo default; set your own in .env.
+      MODERATOR_EMAILS: ${MODERATOR_EMAILS:-marcus@example.com}
+
+  frontend-redesign:
+    build:
+      context: ./frontend-redesign
+    ports:
+      - "5174:5174"
+    environment:
+      # The browser (not the container) calls this address, so it is localhost
+      VITE_API_URL: http://localhost:8000/api/v1
+    depends_on:
+      - backend

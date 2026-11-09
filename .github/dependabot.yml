@@ -1,0 +1,34 @@
+# Weekly pull requests that bump out-of-date dependencies, so security fixes arrive on their own
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /frontend
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /backend
+    target-branch: develop
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /frontend
+    target-branch: develop
+    schedule:
+      interval: weekly

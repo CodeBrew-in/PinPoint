@@ -1,0 +1,47 @@
+@import 'leaflet/dist/leaflet.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-page font-body text-ink antialiased;
+  }
+  /* Page and section titles: heavy, uppercase. Smaller headings: bold, normal case. */
+  h1, h2 {
+    @apply font-display font-extrabold uppercase leading-[1] tracking-tight;
+  }
+  h3, h4 {
+    @apply font-display font-bold leading-tight;
+  }
+  .font-display {
+    font-weight: 700;
+  }
+  :focus-visible {
+    outline: 3px solid #E5432D;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border-2 border-ink bg-cream shadow-stamp;
+  }
+  .label {
+    @apply font-body text-[11px] font-bold uppercase tracking-[0.12em];
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; }
+}
+
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-12deg); }
+}
+
+/* Leaflet: soften the tiles so they sit on the cream page */
+.leaflet-tile-pane { filter: sepia(0.3) saturate(0.8) brightness(1.03); }
+.leaflet-container { font-family: 'DM Sans', sans-serif; background: #F3EDDF; }
+.leaflet-control-zoom a { border-radius: 8px !important; color: #1D1D1F !important; }
