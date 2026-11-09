@@ -97,7 +97,7 @@ def seed() -> str:
                 ))
 
         db.commit()
-        return f"Added 2 demo accounts (password: {DEMO_PASSWORD}) and {len(MAPS)} maps."
+        return f"Added 2 demo accounts and {len(MAPS)} maps."
     finally:
         db.close()
 
