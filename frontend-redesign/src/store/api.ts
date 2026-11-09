@@ -1,12 +1,15 @@
+import { USE_API } from '../lib/http';
 import { canView, sessionUser } from './helpers';
 import { passwordError } from './password';
 import { hashPassword, verifyAgainstDecoy, verifyPassword } from './passwordHash';
+import * as remote from './remote';
 import { commit, getState } from './store';
 import type { MapData, Place, ReportKind, State, User, Visibility } from './types';
 
 /**
- * All reads and writes go through here. Today this works on browser storage;
- * each function maps to one endpoint of the planned FastAPI backend.
+ * All reads and writes go through here. In API mode (VITE_API_URL is set) each function calls the
+ * backend through remote.ts. Otherwise it works on browser storage (the demo).
+ * Anything that changes data is async in both modes, because a network call cannot be instant.
  */
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -38,6 +41,7 @@ function withPlace(s: State, mapId: string, placeId: number, fn: (p: Place) => P
 /* ---------- auth ---------- */
 
 export async function signUp(input: { username: string; email: string; password: string }) {
+  if (USE_API) return remote.signUp(input);
   const s = getState();
   const username = input.username.trim();
   const email = input.email.trim().toLowerCase();
@@ -52,6 +56,7 @@ export async function signUp(input: { username: string; email: string; password:
 }
 
 export async function signIn(emailRaw: string, password: string) {
+  if (USE_API) return remote.signIn(emailRaw, password);
   const email = emailRaw.trim().toLowerCase();
   const user = getState().users.find((u) => u.email === email);
   // Same message for unknown email and wrong password.
@@ -64,10 +69,12 @@ export async function signIn(emailRaw: string, password: string) {
 }
 
 export function signOut() {
+  if (USE_API) return remote.signOut();
   commit({ ...getState(), sessionUserId: null });
 }
 
-export function updateProfile(input: { name: string; email: string; bio: string }) {
+export async function updateProfile(input: { name: string; email: string; bio: string }) {
+  if (USE_API) return remote.updateProfile(input);
   const s = getState();
   const me = requireUser(s);
   const email = input.email.trim().toLowerCase();
@@ -83,6 +90,7 @@ export function updateProfile(input: { name: string; email: string; bio: string 
 }
 
 export async function changePassword(current: string, next: string) {
+  if (USE_API) return remote.changePassword();
   const s = getState();
   const me = requireUser(s);
   if (!(await verifyPassword(current, me.passHash))) throw new Error('Current password is not correct.');
@@ -94,7 +102,8 @@ export async function changePassword(current: string, next: string) {
 
 /* ---------- maps ---------- */
 
-export function createMap(input: { title: string; description: string; category: string; visibility: Visibility }): string {
+export async function createMap(input: { title: string; description: string; category: string; visibility: Visibility }): Promise<string> {
+  if (USE_API) return remote.createMap(input);
   const s = getState();
   const me = requireUser(s);
   const title = input.title.trim();
@@ -116,7 +125,8 @@ export function createMap(input: { title: string; description: string; category:
   return map.id;
 }
 
-export function shareMap(mapId: string, emailRaw: string) {
+export async function shareMap(mapId: string, emailRaw: string) {
+  if (USE_API) return remote.shareMap(mapId, emailRaw);
   const s = getState();
   const me = requireUser(s);
   const map = s.maps.find((m) => m.id === mapId);
@@ -129,7 +139,8 @@ export function shareMap(mapId: string, emailRaw: string) {
   commit(withMap(s, mapId, (m) => ({ ...m, sharedWith: [...m.sharedWith, email] })));
 }
 
-export function unshareMap(mapId: string, email: string) {
+export async function unshareMap(mapId: string, email: string) {
+  if (USE_API) return remote.unshareMap(mapId, email);
   const s = getState();
   const me = requireUser(s);
   const map = s.maps.find((m) => m.id === mapId);
@@ -139,10 +150,11 @@ export function unshareMap(mapId: string, email: string) {
 
 /* ---------- places ---------- */
 
-export function addPlace(
+export async function addPlace(
   mapId: string,
   input: { name: string; description: string; lat: number; lng: number; tags: string[]; photo?: string },
-): number {
+): Promise<number> {
+  if (USE_API) return remote.addPlace(mapId, input);
   const s = getState();
   const me = requireUser(s);
   const map = writableMap(s, mapId);
@@ -167,7 +179,8 @@ export function addPlace(
 }
 
 /** Used when a new submission is recognised as an existing place. */
-export function addToExistingPlace(mapId: string, placeId: number, input: { photo?: string; note?: string }) {
+export async function addToExistingPlace(mapId: string, placeId: number, input: { photo?: string; note?: string }) {
+  if (USE_API) return remote.addToExistingPlace(mapId, placeId, input);
   const s = getState();
   const me = requireUser(s);
   writableMap(s, mapId);
@@ -180,20 +193,23 @@ export function addToExistingPlace(mapId: string, placeId: number, input: { phot
   );
 }
 
-export function addPhoto(mapId: string, placeId: number, photo: string) {
+export async function addPhoto(mapId: string, placeId: number, photo: string) {
+  if (USE_API) return remote.addPhoto(mapId, placeId, photo);
   const s = getState();
   writableMap(s, mapId);
   commit(withPlace(s, mapId, placeId, (p) => ({ ...p, photos: [...p.photos, photo] })));
 }
 
-export function verifyPlace(mapId: string, placeId: number) {
+export async function verifyPlace(mapId: string, placeId: number) {
+  if (USE_API) return remote.verifyPlace(mapId, placeId);
   const s = getState();
   const me = requireUser(s);
   writableMap(s, mapId);
   commit(withPlace(s, mapId, placeId, (p) => ({ ...p, verifiedOn: today(), verifiedBy: me.username })));
 }
 
-export function reportPlace(mapId: string, placeId: number, kind: ReportKind, note: string) {
+export async function reportPlace(mapId: string, placeId: number, kind: ReportKind, note: string) {
+  if (USE_API) return remote.reportPlace(mapId, placeId, kind, note);
   const s = getState();
   const me = requireUser(s);
   const map = writableMap(s, mapId);
@@ -210,7 +226,8 @@ export function reportPlace(mapId: string, placeId: number, kind: ReportKind, no
 
 /* ---------- moderation ---------- */
 
-export function resolveReport(reportId: string, action: 'dismissed' | 'removed') {
+export async function resolveReport(reportId: string, action: 'dismissed' | 'removed') {
+  if (USE_API) return remote.resolveReport(reportId, action);
   const s = getState();
   const me = requireUser(s);
   if (me.role !== 'moderator') throw new Error('Only moderators can do this.');

@@ -1,3 +1,4 @@
+import { USE_API } from '../lib/http';
 import type { MapData, Place, State, User } from './types';
 
 export const fmtCoords = (lat: number, lng: number, digits = 4) =>
@@ -14,12 +15,16 @@ export function canView(map: MapData, user: User | null): boolean {
 
 export function findMap(s: State, id: string | undefined): MapData | undefined {
   const m = s.maps.find((x) => x.id === id);
-  return m && canView(m, sessionUser(s)) ? m : undefined;
+  // In API mode the server already decided who may see a map, and it hides who a map is shared with.
+  return m && (USE_API || canView(m, sessionUser(s))) ? m : undefined;
 }
+
+export const placeCountOf = (m: MapData) => m.placeCount ?? m.places.length;
 
 export const ownerName = (s: State, m: MapData) => s.users.find((u) => u.id === m.ownerId)?.name ?? 'Unknown';
 
 export function contributorCount(s: State, m: MapData) {
+  if (m.contributorCount !== undefined && !m.loaded) return m.contributorCount;
   const owner = s.users.find((u) => u.id === m.ownerId)?.username;
   return new Set([...(owner ? [owner] : []), ...m.places.map((p) => p.addedBy)]).size;
 }
@@ -39,18 +44,20 @@ export type MapCard = {
 };
 
 export function toCard(s: State, m: MapData): MapCard {
-  const n = Math.max(m.places.length, 1);
+  // A map from the server list has only a few preview pins until its places are loaded.
+  const pins = m.loaded || !m.pinsPreview ? m.places.map((p) => ({ lat: p.lat, lng: p.lng, name: p.name })) : m.pinsPreview;
+  const n = Math.max(pins.length, 1);
   return {
     id: m.id,
     title: m.title,
     blurb: m.description,
     category: m.category,
-    places: m.places.length,
+    places: placeCountOf(m),
     contributors: contributorCount(s, m),
     updated: m.updated,
-    lat: m.places.reduce((a, p) => a + p.lat, 0) / n,
-    lng: m.places.reduce((a, p) => a + p.lng, 0) / n,
-    pins: m.places.map((p) => ({ lat: p.lat, lng: p.lng, name: p.name })),
+    lat: pins.reduce((a, p) => a + p.lat, 0) / n,
+    lng: pins.reduce((a, p) => a + p.lng, 0) / n,
+    pins,
   };
 }
 

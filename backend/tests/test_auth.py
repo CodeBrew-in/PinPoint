@@ -14,7 +14,7 @@ def test_signup_creates_user(client):
     response = signup(client)
 
     assert response.status_code == 201
-    assert set(response.json()) == {"id", "email", "created_at"}
+    assert set(response.json()) == {"id", "email", "username", "name", "bio", "role", "created_at"}
     assert response.json()["email"] == EMAIL
 
 

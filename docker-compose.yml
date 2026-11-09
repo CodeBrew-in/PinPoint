@@ -8,6 +8,12 @@ services:
       DATABASE_URL: postgresql://pinpoint:pinpoint@postgres:5432/pinpoint
       SECRET_KEY: ${SECRET_KEY:-dev-only-insecure-secret-key-change-me-in-env}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      # Comma-separated emails that get the moderator role (empty = nobody)
+      MODERATOR_EMAILS: ${MODERATOR_EMAILS:-}
+      # Where uploaded photos are stored inside the container (kept in the media_data volume)
+      MEDIA_DIR: /app/media
+    volumes:
+      - media_data:/app/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,3 +44,4 @@ services:
 
 volumes:
   postgres_data:
+  media_data:

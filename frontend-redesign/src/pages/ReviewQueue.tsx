@@ -3,12 +3,16 @@ import { Button } from '../components/Button';
 import { FieldCard } from '../components/FieldCard';
 import { useSession } from '../components/Layout';
 import { resolveReport } from '../store/api';
+import { LoadError, Loading } from '../components/PageState';
+import { loadReports } from '../store/remote';
 import { useAppState } from '../store/store';
+import { useLoad } from '../store/useLoad';
 
 export default function ReviewQueue() {
   const state = useAppState();
   const user = useSession();
   const [error, setError] = useState('');
+  const load = useLoad(() => (user?.role === 'moderator' ? loadReports() : Promise.resolve()), [user?.id]);
 
   if (user?.role !== 'moderator') {
     return (
@@ -19,12 +23,15 @@ export default function ReviewQueue() {
     );
   }
 
+  if (load.status === 'loading') return <Loading label="Loading reports…" />;
+  if (load.status === 'error') return <LoadError message={load.error} />;
+
   const open = state.reports.filter((r) => r.status === 'open');
   const done = state.reports.filter((r) => r.status !== 'open');
 
-  const resolve = (id: string, action: 'dismissed' | 'removed') => {
+  const resolve = async (id: string, action: 'dismissed' | 'removed') => {
     try {
-      resolveReport(id, action);
+      await resolveReport(id, action);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not resolve.');

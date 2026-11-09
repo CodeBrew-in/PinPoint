@@ -12,6 +12,7 @@ EMAIL="smoke-$(date +%s)-$RANDOM@pinpoint.com"
 PASSWORD="smoke-test-password-1"
 
 cleanup() {
+  rm -f .smoke-photo.png .smoke-fake.txt
   if [ "${KEEP_STACK:-0}" = "1" ]; then
     echo "KEEP_STACK=1: leaving the stack running"
   else
@@ -55,6 +56,57 @@ curl -fsS "$API/auth/me" -H "Authorization: Bearer $TOKEN" | grep -q "$EMAIL" ||
 step "Me rejects a missing token"
 code=$(curl -s -o /dev/null -w '%{http_code}' "$API/auth/me")
 { [ "$code" = "401" ] || [ "$code" = "403" ]; } || fail "/auth/me without token returned $code"
+
+# --- maps, places, photos and privacy (contract v2) ---
+AUTH="Authorization: Bearer $TOKEN"
+JSON="Content-Type: application/json"
+MEDIA_BASE="${API%/api/v1}"
+id_of() { sed -E 's/.*"id":([0-9]+).*/\1/'; }
+
+step "Create a public map and a private map"
+PUBLIC_MAP=$(curl -fsS -X POST "$API/maps" -H "$AUTH" -H "$JSON" \
+  -d '{"title":"Smoke public map","visibility":"public"}' | id_of)
+PRIVATE_MAP=$(curl -fsS -X POST "$API/maps" -H "$AUTH" -H "$JSON" \
+  -d '{"title":"Smoke private map","visibility":"private"}' | id_of)
+[ -n "$PUBLIC_MAP" ] && [ -n "$PRIVATE_MAP" ] || fail "creating maps"
+
+step "A guest sees the public map but not the private one"
+curl -fsS "$API/maps" | grep -q "Smoke public map" || fail "public map missing from the guest list"
+curl -fsS "$API/maps" | grep -q "Smoke private map" && fail "private map leaked into the guest list"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$API/maps/$PRIVATE_MAP")
+[ "$code" = "404" ] || fail "private map returned $code to a guest, expected 404"
+
+step "Add a place to each map"
+PUBLIC_PLACE=$(curl -fsS -X POST "$API/locations" -H "$AUTH" -H "$JSON" \
+  -d "{\"name\":\"Smoke place\",\"lat\":30.34,\"lng\":76.38,\"tags\":[\"smoke\"],\"map_id\":$PUBLIC_MAP}" | id_of)
+PRIVATE_PLACE=$(curl -fsS -X POST "$API/locations" -H "$AUTH" -H "$JSON" \
+  -d "{\"name\":\"Smoke secret\",\"lat\":30.35,\"lng\":76.39,\"map_id\":$PRIVATE_MAP}" | id_of)
+[ -n "$PUBLIC_PLACE" ] && [ -n "$PRIVATE_PLACE" ] || fail "creating places"
+
+step "Places inside a bounding box: guest sees only the public one"
+BOX="76.0,30.0,77.0,31.0"
+curl -fsS "$API/locations?bbox=$BOX" | grep -q "Smoke place" || fail "public place missing from bbox search"
+curl -fsS "$API/locations?bbox=$BOX" | grep -q "Smoke secret" && fail "private place leaked into bbox search"
+curl -fsS "$API/locations?bbox=$BOX" -H "$AUTH" | grep -q "Smoke secret" || fail "owner cannot see their private place"
+
+step "Photo upload accepts a real PNG and rejects a fake one"
+PNG_FILE=".smoke-photo.png"; FAKE_FILE=".smoke-fake.txt"
+printf '\211PNG\r\n\032\n0000000000000000000000000000' > "$PNG_FILE"
+echo "not an image" > "$FAKE_FILE"
+PHOTO_URL=$(curl -fsS -X POST "$API/locations/$PUBLIC_PLACE/photos" -H "$AUTH" -F "file=@$PNG_FILE;type=image/png" \
+  | sed -E 's/.*"url":"([^"]+)".*/\1/')
+[ -n "$PHOTO_URL" ] || fail "photo upload"
+curl -fsS -o /dev/null "$MEDIA_BASE$PHOTO_URL" || fail "uploaded photo is not served at $PHOTO_URL"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/locations/$PUBLIC_PLACE/photos" -H "$AUTH" -F "file=@$FAKE_FILE;type=image/png")
+[ "$code" = "415" ] || fail "fake PNG returned $code, expected 415"
+rm -f "$PNG_FILE" "$FAKE_FILE"
+
+step "Verify a place and report it; reports are for moderators only"
+curl -fsS -X POST "$API/locations/$PUBLIC_PLACE/verify" -H "$AUTH" | grep -q '"verified_by"' || fail "verify"
+curl -fsS -X POST "$API/locations/$PUBLIC_PLACE/reports" -H "$AUTH" -H "$JSON" -d '{"kind":"other","note":"smoke"}' | grep -q '"status":"open"' || fail "report"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$API/reports" -H "$AUTH")
+[ "$code" = "403" ] || fail "reports list returned $code to a normal user, expected 403"
+# --- end of maps, places, photos and privacy ---
 
 step "Frontend responds"
 for _ in $(seq 1 30); do

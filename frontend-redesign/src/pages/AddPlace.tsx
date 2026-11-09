@@ -12,6 +12,9 @@ import { addPlace, addToExistingPlace, fileToDataUrl } from '../store/api';
 import { findMap, findPossibleDuplicates, suggestTags } from '../store/helpers';
 import { useAppState } from '../store/store';
 import type { MapData } from '../store/types';
+import { LoadError, Loading } from '../components/PageState';
+import { loadMap } from '../store/remote';
+import { useLoad } from '../store/useLoad';
 import NotFound from './NotFound';
 
 type Step = 'details' | 'duplicates' | 'done';
@@ -33,7 +36,10 @@ function PickPoint({ onPick }: { onPick: (lat: number, lng: number) => void }) {
 export default function AddPlace() {
   const { id } = useParams();
   const map = findMap(useAppState(), id);
-  if (!map) return <NotFound />;
+  const load = useLoad(() => loadMap(id ?? ''), [id], Boolean(map?.loaded));
+  if (load.status === 'loading') return <Loading label="Loading map…" />;
+  if (load.status === 'error') return <LoadError message={load.error} />;
+  if (!map || load.result === 'missing') return <NotFound />;
   return <AddPlaceForm key={map.id} map={map} />;
 }
 
@@ -55,6 +61,7 @@ function AddPlaceForm({ map }: { map: MapData }) {
   const [customTag, setCustomTag] = useState('');
   const [mergeInto, setMergeInto] = useState<string>('');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false); // stops a double click from adding the place twice
 
   const latN = Number(lat);
   const lngN = Number(lng);
@@ -99,33 +106,41 @@ function AddPlaceForm({ map }: { map: MapData }) {
     setCustomTag('');
   };
 
-  function publishNew() {
+  async function publishNew() {
+    if (busy) return;
+    setBusy(true);
     try {
-      const placeId = addPlace(map.id, { name, description, lat: latN, lng: lngN, tags: chosenTags, photo });
+      const placeId = await addPlace(map.id, { name, description, lat: latN, lng: lngN, tags: chosenTags, photo });
       setResultPlaceId(placeId);
       setMerged(false);
       setStep('done');
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not publish.');
+    } finally {
+      setBusy(false);
     }
   }
 
-  function mergeExisting(placeId: number) {
+  async function mergeExisting(placeId: number) {
+    if (busy) return;
+    setBusy(true);
     try {
-      addToExistingPlace(map.id, placeId, { photo, note: description });
+      await addToExistingPlace(map.id, placeId, { photo, note: description });
       setResultPlaceId(placeId);
       setMerged(true);
       setStep('done');
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not add to the place.');
+    } finally {
+      setBusy(false);
     }
   }
 
   function next() {
     if (dupes.length > 0) return setStep('duplicates');
-    publishNew();
+    void publishNew();
   }
 
   function reset() {
@@ -198,7 +213,7 @@ function AddPlaceForm({ map }: { map: MapData }) {
           <Button onClick={() => setStep('details')}>Back</Button>
           <Button
             variant="primary"
-            disabled={!mergeInto}
+            disabled={!mergeInto || busy}
             className="disabled:opacity-40"
             onClick={() => (mergeInto === 'new' ? publishNew() : mergeExisting(Number(mergeInto)))}
           >
@@ -282,7 +297,7 @@ function AddPlaceForm({ map }: { map: MapData }) {
 
         {error && <p role="alert" className="text-sm font-bold text-danger">{error}</p>}
         <div className="flex items-center gap-3">
-          <Button type="submit" variant="primary" disabled={!canContinue} className="disabled:opacity-40">
+          <Button type="submit" variant="primary" disabled={!canContinue || busy} className="disabled:opacity-40">
             {isPublic ? 'Check nearby' : 'Publish'}
           </Button>
           {!canContinue && <span className="text-sm">Needs a photo, a name, valid coordinates and at least one tag.</span>}

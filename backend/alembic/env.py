@@ -6,7 +6,7 @@ import os
 from app.db.database import engine
 from dotenv import load_dotenv
 from app.db.base import Base
-from app.models.user import User
+import app.models  # noqa: F401  (registers every table for autogenerate)
 from alembic import context
 
 # this is the Alembic Config object, which provides

@@ -10,6 +10,7 @@ before either side codes against the change.
 | Version | Date | Change |
 |---|---|---|
 | 1 | 2026-10-11 | Initial contract: auth (Sprint 1), locations (Sprint 2), create location and photos (Sprint 3) |
+| 2 | 2026-11-02 | **Proposed, needs approval from both.** Adds maps, extra place fields (map, verify, notes, reports), moderators and profile fields. Everything in version 1 still works. See [Version 2 additions](#version-2-additions-proposed). |
 
 ---
 
@@ -189,6 +190,105 @@ Logout is handled on the frontend only, by deleting the stored token. No endpoin
 - **415:** file type not allowed
 
 The frontend uploads photos one at a time after `POST /locations` returns the new `id`.
+
+---
+
+## Version 2 additions (proposed)
+
+Why: the proposal's "Public Maps" and "My Maps" are *named collections of places* (the frontend has
+Create map, My Maps, Map view). Version 1 only has flat places, so there is nothing to attach a map to.
+Version 2 adds that, plus the actions the interface needs (verify, add a note, report, moderate).
+
+**Nothing here changes a version 1 route or field.** One v1 rule is relaxed and is marked **(changed)**.
+Version 2 keeps the same conventions (integer IDs, UTC timestamps, `lat`/`lng`, FastAPI errors).
+
+### Changed and new fields
+
+**User** gains `username`, `name`, `bio`, `role`:
+
+```json
+{ "id": 3, "email": "saneh@example.com", "username": "saneh", "name": "Saneh", "bio": "", "role": "member", "created_at": "2026-10-11T09:30:00Z" }
+```
+
+- `username`: 3 to 30 characters, letters, digits, `_` and `-`, unique (case-insensitive). If not given at signup, it is the part of the email before `@`, made unique with a number if needed.
+- `name`: defaults to `username`. `bio`: up to 180 characters. `role`: `"member"` or `"moderator"`.
+- Moderators are set by the server setting `MODERATOR_EMAILS` (comma-separated emails). There is no admin screen yet.
+
+**Map**:
+
+```json
+{
+  "id": 5, "title": "Patiala heritage", "description": "Forts and palaces", "category": "Heritage",
+  "visibility": "public", "owner_id": 3, "owner_username": "saneh", "owner_name": "Saneh",
+  "place_count": 3, "contributor_count": 2,
+  "pins": [{ "lat": 30.3241, "lng": 76.4031, "name": "Qila Mubarak" }],
+  "shared_with": [], "created_at": "2026-10-11T09:30:00Z", "updated_at": "2026-10-12T10:00:00Z"
+}
+```
+
+`pins` lists up to 12 places, oldest first, for drawing the map card. `shared_with` is only filled for the owner of a private map.
+
+**Location** gains `map_id`, `owner_username`, `verified_at`, `verified_by`, `notes`:
+
+```json
+{
+  "id": 42, "map_id": 5, "name": "Qila Mubarak", "description": "Fort in the old city.",
+  "lat": 30.3241, "lng": 76.4031, "visibility": "public", "tags": ["heritage"],
+  "photos": [{ "id": 7, "url": "/media/photos/7.jpg" }],
+  "notes": [{ "id": 1, "username": "ananya", "text": "Best at 8 AM.", "created_at": "2026-10-12T10:00:00Z" }],
+  "owner_id": 3, "owner_username": "saneh", "verified_at": "2026-10-12T10:00:00Z", "verified_by": "ananya",
+  "created_at": "2026-10-11T09:30:00Z"
+}
+```
+
+`verified_at` and `verified_by` are `null` until someone confirms the place.
+
+**LocationCreate** gains `map_id` (optional). When `map_id` is given, `visibility` is optional and is copied
+from the map. When it is missing, `visibility` is required, as in version 1.
+
+### New endpoints
+
+| Method and path | Auth | What it does |
+|---|---|---|
+| `PATCH /auth/me` | required | Body `{ "name"?, "bio"? }`. Returns `User`. |
+| `GET /maps?scope=public\|mine\|shared&q=&category=` | optional (`mine` and `shared` need a token) | `{ "items": [Map] }`, newest updated first. `public` is the default. `shared` = private maps others shared with my email. |
+| `POST /maps` | required | Body `{ "title", "description"?, "category"?, "visibility" }`. Returns `Map` (201). Title 3 to 72 characters. |
+| `GET /maps/{id}` | optional | `Map`. `404` if private and the caller is not the owner or shared with. |
+| `GET /maps/{id}/locations` | optional | `{ "items": [Location] }`, oldest first. Same visibility rule as the map. |
+| `POST /maps/{id}/shares` | required, owner | Body `{ "email" }`. Private maps only. Returns `Map`. `400` for a public map, yourself or a duplicate. |
+| `DELETE /maps/{id}/shares/{email}` | required, owner | Returns `Map`. |
+| `POST /locations/{id}/notes` | required | Body `{ "text" }` (1 to 500). Returns `Location`. Used when a new submission turns out to be an existing place. |
+| `POST /locations/{id}/verify` | required | Sets `verified_at` and `verified_by` to now and the caller. Returns `Location`. |
+| `POST /locations/{id}/reports` | required | Body `{ "kind", "note"? }`. `kind` is `wrong_location`, `no_longer_exists`, `duplicate`, `spam` or `other`. Returns `Report` (201). |
+| `GET /reports?status=open\|dismissed\|removed` | required, moderator | `{ "items": [Report] }`, newest first. `403` for a non-moderator. |
+| `POST /reports/{id}/resolve` | required, moderator | Body `{ "action": "dismiss" \| "remove" }`. `remove` deletes the place and closes every open report about it. Returns `Report`. |
+
+**Report**:
+
+```json
+{ "id": 9, "location_id": 42, "place_name": "Qila Mubarak", "map_title": "Patiala heritage", "kind": "wrong_location",
+  "note": "Pin looks off", "reporter_username": "ananya", "status": "open", "created_at": "2026-10-12T10:00:00Z" }
+```
+
+`location_id` becomes `null` once the place is removed. `place_name` and `map_title` are kept so the report still makes sense.
+
+### Changed rule **(changed)**
+
+- `POST /locations/{id}/photos` (version 1: owner only) now allows **any signed-in user who can see the place**.
+  The reason is the duplicate flow: when someone finds an existing place, their photo is added to it instead of
+  creating a copy. The `403` case therefore no longer applies; `404` still covers places the caller cannot see.
+
+### Rules that stay on the server
+
+- Visibility: a private map, and every place in it, is invisible (`404`) to everyone except the owner and the
+  emails it is shared with. Private places never appear in `GET /locations` or `GET /maps` for anyone else.
+- A place added to a public map is public. A place added to a private map is private.
+- Only a signed-in user can add, verify, report or share anything. Reading public maps and places needs no account.
+
+### Not in version 2 (still on the frontend)
+
+Tag suggestions and the "is this a duplicate?" check run in the browser for now, using the places already
+fetched. They move to the server (embeddings and PostGIS) in a later version.
 
 ---
 
