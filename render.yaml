@@ -1,0 +1,89 @@
+# Render Blueprint: the free deployment of PinPoint. Guide: docs/DEPLOY_RENDER.md
+#
+#   backend   Docker web service (free) in Singapore, the closest region to India
+#   frontend  static site (free), serves the built frontend-redesign
+#
+# The database is Neon (free, never expires), not Render's own free Postgres (deleted after 30 days).
+# Photos are stored in that same database (MEDIA_BACKEND=db) because a free Render disk is wiped on restart.
+#
+# Both services redeploy by themselves when the CI checks pass on main (autoDeployTrigger: checksPass).
+# If Render says a service name is taken, pick another and update the two URLs marked "keep in step".
+
+services:
+  - type: web
+    name: codebrew-pinpoint-api
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: main
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: MEDIA_BACKEND
+        value: db
+      - key: SIGNUPS
+        value: open
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+      # Random, 256 bits, created once by Render. Changing it logs everyone out and invalidates photo links.
+      - key: SECRET_KEY
+        generateValue: true
+      # Neon connection string (the direct one, with sslmode=require). You paste it in Render's page.
+      - key: DATABASE_URL
+        sync: false
+      # Real addresses that ALREADY have an account. Empty = nobody is a moderator.
+      - key: MODERATOR_EMAILS
+        sync: false
+      # The address of the static site below (keep in step with its URL)
+      - key: FRONTEND_ORIGINS
+        value: https://codebrew-pinpoint.onrender.com
+
+  - type: web
+    name: codebrew-pinpoint
+    runtime: static
+    branch: main
+    rootDir: frontend-redesign
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # The API address, including /api/v1 (keep in step with the backend's URL)
+      - key: VITE_API_URL
+        value: https://codebrew-pinpoint-api.onrender.com/api/v1
+      # Shown on the Privacy, Terms and Contact pages. Public information, set it in Render's page.
+      - key: VITE_OPERATOR_NAME
+        sync: false
+      - key: VITE_CONTACT_EMAIL
+        sync: false
+      - key: VITE_GRIEVANCE_OFFICER
+        sync: false
+    routes:
+      # Single page app: any other address (for example /map/3) serves index.html and the router takes over
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: geolocation=(self), camera=(), microphone=()
+      # Map tiles come from OpenStreetMap, fonts from Google Fonts, data and photos from the API (keep in step with its URL)
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org https://codebrew-pinpoint-api.onrender.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://codebrew-pinpoint-api.onrender.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
