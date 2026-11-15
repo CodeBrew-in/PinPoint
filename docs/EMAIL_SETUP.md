@@ -9,6 +9,25 @@ Never paste a secret into a chat, an issue or a repository file. Type or paste i
 
 ---
 
+## Easiest path: Brevo (free, no domain needed)
+
+Use this if Google will not let you publish the Gmail app (it wants a website domain you own).
+Brevo is free (300 e-mails a day), works over HTTPS, and accepts a Gmail address as the sender after you confirm it.
+
+1. Sign up at https://www.brevo.com (free plan).
+2. **Senders, domains & dedicated IPs**, **Senders**, **Add a sender**: name `PinPoint`, e-mail `thecodebrewcompany@gmail.com`.
+   Brevo e-mails a code to that inbox; enter it to confirm.
+3. Top-right menu, **SMTP & API**, **API Keys**, **Generate a new API key**. Copy it once; type it only into Render.
+4. Render, API service, **Environment**, add:
+   - `EMAIL_PROVIDER` = `brevo`
+   - `BREVO_API_KEY` = the key
+   - `EMAIL_FROM` = `thecodebrewcompany@gmail.com`
+5. Save, then do "Part 4: test" below. Mail from a `gmail.com` sender may land in spam at first.
+
+The Gmail API route below is the alternative.
+
+---
+
 ## Part 1: Google Cloud (about 20 minutes)
 
 Use the Gmail account that will send the mail (`thecodebrewcompany@gmail.com`).
