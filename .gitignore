@@ -6,3 +6,6 @@ __pycache__/
 
 # Uploaded photos (local development)
 backend/media/
+
+# Local security audit reports, never commit these
+security-reports/

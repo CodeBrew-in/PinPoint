@@ -9,10 +9,17 @@ from app.schemas.common import UTCDateTime
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{3,30}$")
 
 
+def _lower_email(value: str) -> str:
+    """Emails are compared in lower case everywhere (roles, shares), so they are stored in lower case."""
+    return value.strip().lower()
+
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     username: Optional[str] = None
+
+    _lower_email = field_validator("email")(_lower_email)
 
     @field_validator("username")
     @classmethod
@@ -30,6 +37,8 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+    _lower_email = field_validator("email")(_lower_email)
 
 
 class UserUpdate(BaseModel):
