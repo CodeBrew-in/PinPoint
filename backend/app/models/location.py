@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Index, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Index, Integer, LargeBinary, String
+from sqlalchemy.orm import deferred, relationship
 
 from app.db.base import Base
 
@@ -38,14 +38,19 @@ class Photo(Base):
     id = Column(Integer, primary_key=True)
     location_id = Column(Integer, ForeignKey("locations.id", ondelete="CASCADE"), nullable=False, index=True)
     uploaded_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    filename = Column(String(64), nullable=True)  # set right after the file is written
+    # Where the picture is kept: a file name (local storage) or the bytes themselves (MEDIA_BACKEND=db).
+    filename = Column(String(64), nullable=True)
+    data = deferred(Column(LargeBinary, nullable=True))  # deferred: listing places must not load every picture
+    content_type = Column(String(30), nullable=True)
+    size_bytes = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     location = relationship("Location", back_populates="photos")
 
     @property
-    def url(self) -> str:
-        return f"/media/photos/{self.filename}"
+    def stored(self) -> bool:
+        """True once the picture has really been saved (a row exists a moment before that)."""
+        return bool(self.filename) or (self.size_bytes or 0) > 0
 
 
 class LocationNote(Base):

@@ -1,6 +1,17 @@
-"""Photo storage on local disk. Swap this module for S3 later; the API does not change."""
+"""Photo storage and the signed links that serve photos.
+
+Two storage places, chosen with MEDIA_BACKEND:
+  local (default)  files in MEDIA_DIR: for a laptop
+  db               the bytes live in the photos table: for hosts without a persistent disk (Render free)
+
+Photos are never served from a public folder. The API gives every photo a link signed with SECRET_KEY that
+expires, and only people who may see the place receive it, so a private photo cannot be fetched by guessing.
+"""
+import hashlib
+import hmac
 import io
 import os
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -9,8 +20,12 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB, as in the contract
 # Whole request limit: one photo plus room for the multipart wrapping
 MAX_REQUEST_BYTES = MAX_PHOTO_BYTES + 512 * 1024
-# Refuse images that would unpack into a huge bitmap ("decompression bombs"): 40 megapixels is plenty for a phone photo
-MAX_PIXELS = 40_000_000
+# Stored photos are shrunk so that many fit in a small database
+MAX_SIDE = 1600
+# How long a photo link stays valid (it is renewed each time the place is loaded)
+LINK_WINDOW_SECONDS = 6 * 3600
+# Refuse images that would unpack into a huge bitmap ("decompression bombs")
+MAX_PIXELS = 24_000_000  # a free host has little memory; 24 MP is more than a phone photo needs
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 
 # content type -> (file extension, check on the first bytes of the file, Pillow format name)
@@ -23,6 +38,10 @@ ALLOWED = {
 
 class ImageRejected(ValueError):
     """The bytes are not a usable image of the declared type."""
+
+
+def media_backend() -> str:
+    return "db" if os.getenv("MEDIA_BACKEND", "local").strip().lower() == "db" else "local"
 
 
 def media_root() -> Path:
@@ -66,6 +85,7 @@ def clean_image(extension: str, data: bytes) -> bytes:
     except (UnidentifiedImageError, Image.DecompressionBombError, OSError, SyntaxError) as error:
         raise ImageRejected("The file could not be read as an image") from error
 
+    image.thumbnail((MAX_SIDE, MAX_SIDE))  # shrink big photos; small ones stay as they are
     if pillow_format == "JPEG" and image.mode not in ("RGB", "L"):
         image = image.convert("RGB")
     image.info = {}  # drop text chunks, ICC and other metadata Pillow would otherwise copy
@@ -87,3 +107,30 @@ def delete_photo(filename: Optional[str]) -> None:
         (photos_dir() / filename).unlink(missing_ok=True)
     except OSError:
         pass  # a leftover file is better than failing a moderator's action
+
+
+# ---------- signed links ----------
+
+def _secret() -> bytes:
+    from app.core.security import SECRET_KEY  # the same key that signs login tokens
+
+    return SECRET_KEY.encode("utf-8")
+
+
+def _signature(photo_id: int, expires: int) -> str:
+    return hmac.new(_secret(), f"photo:{photo_id}:{expires}".encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def signed_photo_url(photo_id: int, now: Optional[float] = None) -> str:
+    """A relative link to the photo that works for 6 to 12 hours.
+
+    The expiry is rounded to a fixed window, so the same photo gets the same link for hours and the browser can cache it.
+    """
+    now = time.time() if now is None else now
+    expires = (int(now // LINK_WINDOW_SECONDS) + 2) * LINK_WINDOW_SECONDS
+    return f"/api/v1/media/photos/{photo_id}?exp={expires}&sig={_signature(photo_id, expires)}"
+
+
+def link_is_valid(photo_id: int, expires: int, signature: str, now: Optional[float] = None) -> bool:
+    now = time.time() if now is None else now
+    return expires > now and hmac.compare_digest(_signature(photo_id, expires), signature or "")

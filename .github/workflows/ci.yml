@@ -103,6 +103,25 @@ jobs:
       - name: Dependency audit (warning only)
         run: pip-audit -r requirements.txt || true
 
+      # A typo in render.yaml would only show up at deploy time, so check it here
+      - name: render.yaml is valid and complete
+        run: |
+          pip install pyyaml
+          python - <<'PY'
+          import yaml
+          doc = yaml.safe_load(open("../render.yaml", encoding="utf-8"))
+          services = {s["name"]: s for s in doc["services"]}
+          assert len(services) == 2, "expected the backend and the static site"
+          api = next(s for s in services.values() if s["runtime"] == "docker")
+          web = next(s for s in services.values() if s["runtime"] == "static")
+          keys = {e["key"] for e in api["envVars"]}
+          for needed in ("DATABASE_URL", "SECRET_KEY", "MEDIA_BACKEND", "APP_ENV", "FRONTEND_ORIGINS"):
+              assert needed in keys, f"backend is missing {needed}"
+          assert any(e["key"] == "VITE_API_URL" for e in web["envVars"]), "the site needs VITE_API_URL"
+          assert api["healthCheckPath"] == "/api/v1/health"
+          print("render.yaml ok")
+          PY
+
   docker:
     name: Docker (build and smoke test)
     runs-on: ubuntu-latest

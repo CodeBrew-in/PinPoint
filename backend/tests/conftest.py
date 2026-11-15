@@ -55,6 +55,8 @@ from app import models as _models  # noqa: E402,F401  (registers every table; a 
 
 @pytest.fixture(scope="session", autouse=True)
 def create_tables():
+    # A throw-away database: rebuild it every run, so new columns and indexes are never missing
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
 

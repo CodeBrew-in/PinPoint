@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { FieldCard } from '../components/FieldCard';
 import { Input } from '../components/Input';
 import { useSession } from '../components/Layout';
 import { PasswordField } from '../components/PasswordField';
+import { USE_API } from '../lib/http';
 import { signIn, signUp } from '../store/api';
+import { fetchConfig } from '../store/remote';
 import { passwordProblems } from '../store/password';
 
 function AuthShell({ title, intro, children, footer }: { title: string; intro: string; children: React.ReactNode; footer: React.ReactNode }) {
@@ -85,6 +87,12 @@ export function SignUp() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [signupsOpen, setSignupsOpen] = useState(true);
+
+  // The owner can close signups from the server; say so before anyone fills in the form
+  useEffect(() => {
+    if (USE_API) void fetchConfig().then((c) => setSignupsOpen(c.signupsOpen));
+  }, []);
 
   const passwordOk = passwordProblems(password, { username, email }).length === 0;
 
@@ -122,9 +130,12 @@ export function SignUp() {
           showRules
           context={{ username, email }}
         />
+        {!signupsOpen && (
+          <p role="status" className="text-sm font-bold">New accounts are closed for now. If you already have an account, sign in. Please check back later.</p>
+        )}
         {error && <p role="alert" className="text-sm font-bold text-danger">{error}</p>}
         <div>
-          <Button type="submit" variant="primary" disabled={busy || !passwordOk} className="disabled:opacity-40">Create account</Button>
+          <Button type="submit" variant="primary" disabled={busy || !passwordOk || !signupsOpen} className="disabled:opacity-40">Create account</Button>
         </div>
       </form>
     </AuthShell>

@@ -132,6 +132,16 @@ async function startSession() {
   resetPrivateCache();
 }
 
+/** Settings the site needs before sign-in. If the server cannot be reached, assume signup is open (the form shows the real error). */
+export async function fetchConfig(): Promise<{ signupsOpen: boolean }> {
+  try {
+    const c = await request<{ signups_open: boolean }>('/config');
+    return { signupsOpen: c.signups_open };
+  } catch {
+    return { signupsOpen: true };
+  }
+}
+
 /** Runs once when the app starts: if a token is saved, check it with the server. */
 export async function initAuth() {
   try {
