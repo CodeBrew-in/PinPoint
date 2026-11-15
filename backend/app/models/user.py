@@ -20,6 +20,8 @@ class User(Base):
     username = Column(String(30), nullable=True, index=True)
     name = Column(String(60), nullable=True)
     bio = Column(String(180), nullable=False, default="", server_default="")
+    # Set when the person opened the link e-mailed to this address, proving they own it
+    email_verified_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         DateTime,

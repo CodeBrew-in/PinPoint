@@ -12,9 +12,12 @@ from app.api.locations import router as locations_router
 from app.api.maps import router as maps_router
 from app.api.media import router as media_router
 from app.api.reports import router as reports_router
+from app.core.emailconfig import check_email_config
 from app.services.media import MAX_REQUEST_BYTES
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+check_email_config()  # refuse to start if e-mail verification is demanded but cannot work
 
 # "production" turns off the interactive API docs; anything else is development
 APP_ENV = os.getenv("APP_ENV", "development").strip().lower()

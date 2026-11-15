@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.api.deps import current_user, optional_user
+from app.api.deps import current_user, optional_user, verified_user
 from app.core.ratelimit import hit
 from app.db.database import get_db
 from app.models.map import Map, MapShare
@@ -77,7 +77,7 @@ def list_maps(
 
 
 @router.post("", response_model=MapRead, status_code=status.HTTP_201_CREATED)
-def create_map(body: MapCreate, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def create_map(body: MapCreate, db: Session = Depends(get_db), user: User = Depends(verified_user)):
     hit(f"map:user:{user.id}", limit=20, window_seconds=3600)
     map_ = Map(
         owner_id=user.id,
@@ -121,7 +121,7 @@ def list_map_locations(
 
 
 @router.post("/{map_id}/shares", response_model=MapRead)
-def share_map(map_id: int, body: ShareCreate, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def share_map(map_id: int, body: ShareCreate, db: Session = Depends(get_db), user: User = Depends(verified_user)):
     map_ = _owned_map(db, map_id, user)
     if map_.visibility != "private":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Public maps do not need sharing")

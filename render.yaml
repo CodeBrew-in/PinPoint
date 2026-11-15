@@ -43,6 +43,11 @@ services:
       # The address of the static site below (keep in step with its URL)
       - key: FRONTEND_ORIGINS
         value: https://codebrew-pinpoint.onrender.com
+      # Used in the links of e-mails (keep in step with the static site's URL).
+      # The e-mail settings themselves (EMAIL_PROVIDER, GMAIL_*, EMAIL_VERIFICATION) are added later in Render's
+      # Environment page, see docs/EMAIL_SETUP.md, so that a redeploy never overwrites them.
+      - key: APP_URL
+        value: https://codebrew-pinpoint.onrender.com
 
   - type: web
     name: codebrew-pinpoint

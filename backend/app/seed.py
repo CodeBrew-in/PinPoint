@@ -79,6 +79,7 @@ def seed() -> str:
                 username=username,
                 name=name,
                 bio="Demo account.",
+                email_verified_at=now,  # demo accounts work even when e-mail verification is required
             )
             db.add(user)
             users[username] = user

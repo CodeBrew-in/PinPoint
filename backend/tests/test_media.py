@@ -137,7 +137,7 @@ def test_database_photos_are_removed_with_their_place(client, make_user, db_stor
 
 
 def test_signups_are_open_by_default(client):
-    assert client.get(f"{API}/config").json() == {"signups_open": True}
+    assert client.get(f"{API}/config").json()["signups_open"] is True
     assert client.post(f"{API}/auth/signup", json={"email": "new@pinpoint.com", "password": "password123"}).status_code == 201
 
 
@@ -145,7 +145,7 @@ def test_closing_signups_refuses_new_accounts_but_not_sign_in(client, make_user,
     make_user("old@pinpoint.com")
     monkeypatch.setenv("SIGNUPS", "closed")
 
-    assert client.get(f"{API}/config").json() == {"signups_open": False}
+    assert client.get(f"{API}/config").json()["signups_open"] is False
     blocked = client.post(f"{API}/auth/signup", json={"email": "new@pinpoint.com", "password": "password123"})
     assert blocked.status_code == 403
     assert "closed" in blocked.json()["detail"].lower()

@@ -11,7 +11,7 @@ import type { MapData, Place, Report, ReportKind, State, User, Visibility } from
 
 /* ---------- what the server sends (see the contract) ---------- */
 
-interface ApiUser { id: number; email: string; username: string; name: string; bio: string; role: string }
+interface ApiUser { id: number; email: string; username: string; name: string; bio: string; role: string; email_verified: boolean }
 interface ApiPin { lat: number; lng: number; name: string }
 interface ApiMap {
   id: number; title: string; description: string; category: string; visibility: string;
@@ -51,6 +51,7 @@ function userFromApi(u: ApiUser): User {
   return {
     id: userId(u.id), username: u.username, name: u.name, email: u.email, bio: u.bio,
     role: u.role === 'moderator' ? 'moderator' : 'member',
+    emailVerified: u.email_verified,
     passHash: '', // the server keeps passwords; the browser never has one
   };
 }
@@ -133,12 +134,12 @@ async function startSession() {
 }
 
 /** Settings the site needs before sign-in. If the server cannot be reached, assume signup is open (the form shows the real error). */
-export async function fetchConfig(): Promise<{ signupsOpen: boolean }> {
+export async function fetchConfig(): Promise<{ signupsOpen: boolean; emailVerification: boolean }> {
   try {
-    const c = await request<{ signups_open: boolean }>('/config');
-    return { signupsOpen: c.signups_open };
+    const c = await request<{ signups_open: boolean; email_verification: boolean }>('/config');
+    return { signupsOpen: c.signups_open, emailVerification: c.email_verification };
   } catch {
-    return { signupsOpen: true };
+    return { signupsOpen: true, emailVerification: false };
   }
 }
 
@@ -167,6 +168,24 @@ export async function signIn(email: string, password: string) {
   });
   setToken(access_token);
   await startSession();
+}
+
+/** The link in the confirmation e-mail. Works signed in or out; if signed in, refresh who we are. */
+export async function verifyEmail(token: string) {
+  await request('/auth/verify-email', { json: { token } });
+  if (getToken()) await startSession().catch(() => undefined);
+}
+
+export async function resendVerification() {
+  await request('/auth/resend-verification', { method: 'POST' });
+}
+
+export async function forgotPassword(email: string) {
+  await request('/auth/forgot-password', { json: { email: email.trim().toLowerCase() } });
+}
+
+export async function resetPassword(token: string, password: string) {
+  await request('/auth/reset-password', { json: { token, password } });
 }
 
 export function signOut() {

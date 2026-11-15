@@ -69,9 +69,9 @@ export function SignIn() {
         {error && <p role="alert" className="text-sm font-bold text-danger">{error}</p>}
         <div className="flex items-center justify-between gap-3">
           <Button type="submit" variant="primary" disabled={busy}>Sign in</Button>
-          <button type="button" className="label underline underline-offset-4" onClick={() => setError('Password reset needs the backend and is not built yet.')}>
+          <Link to={USE_API ? '/forgot-password' : '#'} className="label underline underline-offset-4" onClick={(e) => { if (!USE_API) { e.preventDefault(); setError('Password reset needs the real backend. The browser-only demo has no e-mail.'); } }}>
             Forgot password?
-          </button>
+          </Link>
         </div>
       </form>
     </AuthShell>

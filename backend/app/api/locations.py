@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, Up
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.api.deps import current_user, optional_user
+from app.api.deps import current_user, optional_user, verified_user
 from app.core.ratelimit import hit
-from app.core.roles import is_moderator
+from app.core.roles import has_moderator_role
 from app.db.database import get_db
 from app.models.location import Location, LocationNote, Photo, Report
 from app.models.map import Map, MapShare
@@ -66,7 +66,7 @@ def _can_manage(location: Location, user: User) -> bool:
         return True
     if location.map is not None and location.map.owner_id == user.id:
         return True
-    return is_moderator(user.email)
+    return has_moderator_role(user)
 
 
 def _touch(location: Location) -> None:
@@ -122,7 +122,7 @@ def list_locations(
 
 
 @router.post("", response_model=LocationRead, status_code=status.HTTP_201_CREATED)
-def create_location(body: LocationCreate, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def create_location(body: LocationCreate, db: Session = Depends(get_db), user: User = Depends(verified_user)):
     _limit("place", user)
     map_ = None
     if body.map_id is not None:
@@ -175,7 +175,7 @@ def upload_photo(
     location_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: User = Depends(current_user),
+    user: User = Depends(verified_user),
 ):
     location = _visible_location(db, location_id, user)
     _limit("photo", user)
@@ -244,7 +244,7 @@ def delete_location_photo(
 
 @router.post("/{location_id}/notes", response_model=LocationRead, status_code=status.HTTP_201_CREATED)
 def add_note(
-    location_id: int, body: NoteCreate, db: Session = Depends(get_db), user: User = Depends(current_user)
+    location_id: int, body: NoteCreate, db: Session = Depends(get_db), user: User = Depends(verified_user)
 ):
     location = _visible_location(db, location_id, user)
     _limit("note", user)
@@ -271,7 +271,7 @@ def delete_note(location_id: int, note_id: int, db: Session = Depends(get_db), u
 
 
 @router.post("/{location_id}/verify", response_model=LocationRead)
-def verify_location(location_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def verify_location(location_id: int, db: Session = Depends(get_db), user: User = Depends(verified_user)):
     location = _visible_location(db, location_id, user)
     if location.owner_id == user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot verify a place you added")
@@ -286,7 +286,7 @@ def verify_location(location_id: int, db: Session = Depends(get_db), user: User 
 
 @router.post("/{location_id}/reports", response_model=ReportRead, status_code=status.HTTP_201_CREATED)
 def report_location(
-    location_id: int, body: ReportCreate, db: Session = Depends(get_db), user: User = Depends(current_user)
+    location_id: int, body: ReportCreate, db: Session = Depends(get_db), user: User = Depends(verified_user)
 ):
     location = _visible_location(db, location_id, user)
     _limit("report", user)
