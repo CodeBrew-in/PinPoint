@@ -20,6 +20,7 @@ from app.core.emailconfig import provider, sender_address
 log = logging.getLogger("pinpoint.mail")
 
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+BREVO_SEND_URL = "https://api.brevo.com/v3/smtp/email"
 GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
 
 _token_lock = threading.Lock()
@@ -68,6 +69,16 @@ def _send_gmail_api(message: EmailMessage) -> None:
     response.raise_for_status()
 
 
+def _send_brevo(to: str, subject: str, text: str) -> None:
+    response = httpx.post(
+        BREVO_SEND_URL,
+        json={"sender": {"name": "PinPoint", "email": sender_address()}, "to": [{"email": to}], "subject": subject, "textContent": text},
+        headers={"api-key": os.getenv("BREVO_API_KEY", "").strip(), "accept": "application/json"},
+        timeout=20,
+    )
+    response.raise_for_status()
+
+
 def _send_smtp(message: EmailMessage) -> None:
     user = os.getenv("SMTP_USER", "").strip()
     password = os.getenv("SMTP_PASSWORD", "")
@@ -92,6 +103,10 @@ def send_email(to: str, subject: str, text: str) -> None:
         log.warning("E-mail is not configured. Would have sent to %s: %s\n%s", to, subject, text)
         return
     try:
+        if chosen == "brevo":
+            _send_brevo(to, subject, text)
+            log.info("Sent e-mail %r to %s via %s", subject, to, chosen)
+            return
         message = _build_message(to, subject, text)
         if chosen == "gmail_api":
             _send_gmail_api(message)

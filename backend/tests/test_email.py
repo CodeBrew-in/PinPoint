@@ -317,3 +317,35 @@ def test_an_incomplete_gmail_setup_counts_as_not_configured(monkeypatch):
         monkeypatch.delenv(key, raising=False)
 
     assert email_configured() is False
+
+
+def test_the_brevo_sender_posts_to_the_api_with_the_key(monkeypatch):
+    from app.services import mailer
+
+    monkeypatch.setenv("EMAIL_PROVIDER", "brevo")
+    monkeypatch.setenv("BREVO_API_KEY", "key-1")
+    monkeypatch.setenv("EMAIL_FROM", "sender@gmail.com")
+    calls = []
+
+    class Reply:
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(mailer.httpx, "post", lambda url, **kw: calls.append((url, kw)) or Reply())
+
+    mailer.send_email("someone@pinpoint.com", "Hello", "Body text")
+
+    url, kw = calls[0]
+    assert url == "https://api.brevo.com/v3/smtp/email" and kw["headers"]["api-key"] == "key-1"
+    assert kw["json"]["to"] == [{"email": "someone@pinpoint.com"}] and kw["json"]["sender"]["email"] == "sender@gmail.com"
+    assert kw["json"]["subject"] == "Hello" and kw["json"]["textContent"] == "Body text"
+
+
+def test_brevo_needs_both_the_key_and_a_sender(monkeypatch):
+    from app.core.emailconfig import email_configured
+
+    monkeypatch.setenv("EMAIL_PROVIDER", "brevo")
+    monkeypatch.setenv("BREVO_API_KEY", "key-1")
+    monkeypatch.delenv("EMAIL_FROM", raising=False)
+
+    assert email_configured() is False
