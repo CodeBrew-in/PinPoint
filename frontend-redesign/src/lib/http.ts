@@ -11,7 +11,9 @@ export const API_URL = rawUrl ? rawUrl.replace(/\/+$/, '') : '';
 export const USE_API = Boolean(API_URL) && import.meta.env.VITE_USE_MOCKS !== 'true';
 
 /** Where uploaded photos live: the API host without the /api/v1 part. */
-const API_ORIGIN = API_URL ? new URL(API_URL).origin : '';
+// VITE_API_URL may be absolute (http://localhost:8000/api/v1) or relative (/api/v1, when the same web server
+// serves the app and proxies the API, as in production). A relative one resolves against this page.
+const API_ORIGIN = API_URL ? new URL(API_URL, window.location.origin).origin : '';
 
 /** Same key the other frontend uses, so both read the same login if they share an origin. */
 const TOKEN_KEY = 'token';
