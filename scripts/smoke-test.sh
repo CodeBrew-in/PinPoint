@@ -24,6 +24,11 @@ trap cleanup EXIT
 step() { printf '\n==> %s\n' "$1"; }
 fail() { echo "FAILED: $1" >&2; exit 1; }
 
+# The backend refuses to start without a SECRET_KEY, so give this throw-away stack a random one
+# (openssl or /dev/urandom, not python3: on Windows "python3" can be a Microsoft Store stub that hangs)
+export SECRET_KEY="${SECRET_KEY:-$(openssl rand -hex 32 2>/dev/null || head -c 48 /dev/urandom | od -An -tx1 | tr -d ' 
+')}"
+
 step "Starting the stack"
 docker compose up -d --build --wait
 

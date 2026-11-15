@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime
 from typing import Optional
 
@@ -143,8 +144,9 @@ async def upload_photo(
 
     photo = Photo(location_id=location.id, uploaded_by_id=user.id)
     db.add(photo)
-    db.flush()  # gives the photo its id, which becomes the file name
-    filename = f"{photo.id}.{extension}"
+    db.flush()  # gives the photo its id
+    # An unguessable name: /media is served without a login, so the name is what keeps private photos private
+    filename = f"{secrets.token_urlsafe(16)}.{extension}"
     try:
         save_photo(filename, data)
     except OSError:

@@ -173,7 +173,7 @@ def test_upload_photo_and_fetch_the_file(client, make_user):
 
     assert response.status_code == 201
     photo = response.json()
-    assert photo["url"] == f"/media/photos/{photo['id']}.png"
+    assert photo["url"].startswith("/media/photos/") and photo["url"].endswith(".png")
     assert client.get(photo["url"]).content == PNG
     assert client.get(f"{API}/locations/{place_id}").json()["photos"] == [photo]
 

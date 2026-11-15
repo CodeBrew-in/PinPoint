@@ -11,6 +11,9 @@ from sqlalchemy.orm import Session
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
+# The app refuses to start without a SECRET_KEY (a throw-away value, only used by the tests).
+os.environ.setdefault("SECRET_KEY", "test-only-secret-key-for-the-test-suite-0123456789")
+
 # Uploaded photos go to a throwaway folder during tests (set before the app is imported).
 os.environ.setdefault("MEDIA_DIR", tempfile.mkdtemp(prefix="pinpoint-media-"))
 

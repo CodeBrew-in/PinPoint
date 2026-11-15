@@ -36,7 +36,7 @@ def _pick_username(db: Session, email: str, requested: str | None) -> str:
 
 @router.post("/signup", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def signup(user: UserCreate, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.email == user.email).first()
+    existing_user = db.query(User).filter(func.lower(User.email) == user.email).first()
 
     if existing_user:
         raise HTTPException(
@@ -62,7 +62,7 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(user: UserLogin, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.email == user.email).first()
+    existing_user = db.query(User).filter(func.lower(User.email) == user.email).first()
 
     if not existing_user or not verify_password(
         user.password,

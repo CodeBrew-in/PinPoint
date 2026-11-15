@@ -81,7 +81,7 @@ def test_remove_also_deletes_the_photo_files(client, make_user, monkeypatch):
     photo = client.post(
         f"{API}/locations/{place_id}/photos", files={"file": ("p.png", PNG, "image/png")}, headers=owner
     ).json()
-    on_disk = Path(__import__("os").environ["MEDIA_DIR"]) / "photos" / f"{photo['id']}.png"
+    on_disk = Path(__import__("os").environ["MEDIA_DIR"]) / "photos" / photo["url"].rsplit("/", 1)[1]
     assert on_disk.exists()
 
     item = report(client, visitor, place_id)
