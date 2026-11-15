@@ -112,6 +112,14 @@ export function Layout() {
       <main className="flex-1">
         <Outlet />
       </main>
+      <footer className="border-t-2 border-ink bg-page">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-5 py-4 text-sm md:px-10">
+          <span className="font-medium">PinPoint</span>
+          <NavLink to="/privacy" className="hover:underline">Privacy</NavLink>
+          <NavLink to="/terms" className="hover:underline">Terms</NavLink>
+          <NavLink to="/contact" className="hover:underline">Contact</NavLink>
+        </div>
+      </footer>
     </div>
   );
 }

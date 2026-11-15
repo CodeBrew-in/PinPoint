@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Index, Integer, String, func
+from sqlalchemy import Column, DateTime, Index, Integer, String, text
 
 from app.db.base import Base
 
@@ -9,8 +9,8 @@ class User(Base):
     __tablename__ = "users"
     # One account per address and per username, whatever the upper/lower case
     __table_args__ = (
-        Index("uq_users_email_lower", func.lower("email"), unique=True),
-        Index("uq_users_username_lower", func.lower("username"), unique=True),
+        Index("uq_users_email_lower", text("lower(email)"), unique=True),
+        Index("uq_users_username_lower", text("lower(username)"), unique=True),
     )
 
     id = Column(Integer, primary_key=True, index=True)

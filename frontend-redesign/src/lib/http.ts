@@ -89,8 +89,12 @@ export async function request<T>(path: string, options: Options = {}): Promise<T
     } catch {
       /* not JSON */
     }
+    if (response.status === 429) {
+      throw new ApiError('Too many attempts. Please wait a few minutes and try again.', 429);
+    }
     throw new ApiError(messageFrom(detail, `The server answered with an error (${response.status}).`), response.status);
   }
+  if (response.status === 204) return undefined as T; // deletes answer with no body
   return (await response.json()) as T;
 }
 

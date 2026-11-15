@@ -25,6 +25,10 @@ services:
     build:
       context: ./frontend-redesign
       dockerfile: Dockerfile.prod
+      args:
+        VITE_OPERATOR_NAME: ${OPERATOR_NAME:-}
+        VITE_CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+        VITE_GRIEVANCE_OFFICER: ${GRIEVANCE_OFFICER:-}
     restart: unless-stopped
     depends_on:
       backend:

@@ -9,6 +9,11 @@ COPY . .
 # run the browser-only demo, so refuse to build.
 ARG VITE_API_URL=/api/v1
 ENV VITE_API_URL=$VITE_API_URL
+# Shown on the Privacy, Terms and Contact pages
+ARG VITE_OPERATOR_NAME=
+ARG VITE_CONTACT_EMAIL=
+ARG VITE_GRIEVANCE_OFFICER=
+ENV VITE_OPERATOR_NAME=$VITE_OPERATOR_NAME VITE_CONTACT_EMAIL=$VITE_CONTACT_EMAIL VITE_GRIEVANCE_OFFICER=$VITE_GRIEVANCE_OFFICER
 RUN test -n "$VITE_API_URL" || (echo "VITE_API_URL must be set for a production build" && exit 1)
 RUN npm run build
 

@@ -20,6 +20,33 @@ os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 # Uploaded photos go to a throwaway folder during tests (set before the app is imported).
 os.environ.setdefault("MEDIA_DIR", tempfile.mkdtemp(prefix="pinpoint-media-"))
 
+
+
+def _use_separate_test_database() -> None:
+    """Point the tests at <database>_test, creating it if needed.
+
+    The tests create tables and run in rolled-back transactions; they must never touch the development
+    database (they once left its tables without a migration record).
+    """
+    from dotenv import load_dotenv
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import make_url
+
+    load_dotenv()
+    url = make_url(os.environ["DATABASE_URL"])
+    if not url.database.endswith("_test"):
+        url = url.set(database=f"{url.database}_test")
+    admin = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        exists = connection.execute(text("SELECT 1 FROM pg_database WHERE datname = :n"), {"n": url.database}).scalar()
+        if not exists:
+            connection.execute(text(f'CREATE DATABASE "{url.database}"'))
+    admin.dispose()
+    os.environ["DATABASE_URL"] = url.render_as_string(hide_password=False)
+
+
+_use_separate_test_database()
+
 from app.db.base import Base  # noqa: E402
 from app.db.database import engine, get_db  # noqa: E402
 from app.main import app  # noqa: E402

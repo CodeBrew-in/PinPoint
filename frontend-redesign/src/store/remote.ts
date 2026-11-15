@@ -287,6 +287,23 @@ export async function reportPlace(_mapId: string, placeId: number, kind: ReportK
   await request(`/locations/${placeId}/reports`, { json: { kind: REPORT_KIND_TO_API[kind], note } });
 }
 
+/** Deleting needs the password again, so a stolen login alone cannot erase an account. */
+export async function deleteAccount(password: string) {
+  await request('/auth/me', { method: 'DELETE', json: { password } });
+  signOut();
+}
+
+export async function deletePlace(mapId: string, placeId: number) {
+  await request(`/locations/${placeId}`, { method: 'DELETE' });
+  await loadMap(mapId);
+}
+
+export async function deleteMap(mapId: string) {
+  await request(`/maps/${mapId}`, { method: 'DELETE' });
+  const s = getState();
+  commit({ ...s, maps: s.maps.filter((m) => m.id !== mapId) });
+}
+
 export async function resolveReport(reportId: string, action: 'dismissed' | 'removed') {
   await request(`/reports/${reportId}/resolve`, { json: { action: action === 'dismissed' ? 'dismiss' : 'remove' } });
   await loadReports();
