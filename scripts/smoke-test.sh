@@ -5,6 +5,10 @@
 #   bash scripts/smoke-test.sh                 # start, test, then remove the test containers and their data
 #   KEEP_STACK=1 bash scripts/smoke-test.sh    # leave the test stack running afterwards
 #
+# Live mode tests a site that is already running (no Docker), for example the deployed one. It creates two
+# throw-away accounts and deletes them at the end:
+#   LIVE=1 API=https://my-api.onrender.com/api/v1 WEB=https://my-site.onrender.com bash scripts/smoke-test.sh
+#
 # It runs as its own Compose project ("pinpoint-smoke"), so "down -v" only ever deletes the test stack's
 # volumes, never your development or production data. It uses the same ports as the dev stack,
 # so stop the dev stack first (docker compose down, without -v).
@@ -17,9 +21,18 @@ WEB="${WEB:-http://localhost:5173}"
 EMAIL="smoke-$(date +%s)-$RANDOM@pinpoint.com"
 PASSWORD="smoke-test-password-1"
 
+LIVE="${LIVE:-0}"
+
+delete_account() { # $1 = bearer token: removes a throw-away account and everything it created
+  [ -n "${1:-}" ] && curl -s -o /dev/null -X DELETE "$API/auth/me" -H "Authorization: Bearer $1"     -H "Content-Type: application/json" -d "{\"password\":\"$PASSWORD\"}" || true
+}
+
 cleanup() {
   rm -f .smoke-photo.png .smoke-fake.txt
-  if [ "${KEEP_STACK:-0}" = "1" ]; then
+  if [ "$LIVE" = "1" ]; then
+    delete_account "${TOKEN:-}"; delete_account "${TOKEN2:-}"
+    echo "Live mode: the two test accounts were deleted"
+  elif [ "${KEEP_STACK:-0}" = "1" ]; then
     echo "KEEP_STACK=1: leaving the stack running"
   else
     "${COMPOSE[@]}" down -v
@@ -34,17 +47,19 @@ fail() { echo "FAILED: $1" >&2; exit 1; }
 # (openssl or /dev/urandom, not python3: on Windows "python3" can be a Microsoft Store stub that hangs)
 export SECRET_KEY="${SECRET_KEY:-$(openssl rand -hex 32 2>/dev/null || head -c 48 /dev/urandom | od -An -tx1 | tr -d ' \n')}"
 
-step "Starting the stack"
-"${COMPOSE[@]}" up -d --build --wait
+if [ "$LIVE" != "1" ]; then
+  step "Starting the stack"
+  "${COMPOSE[@]}" up -d --build --wait
+fi
 
-step "Backend health (waiting for migrations and startup, up to 90 s)"
+step "Backend health (waiting for migrations, startup or a sleeping free host, up to 3 minutes)"
 # "docker compose --wait" returns once the containers are running, which can be
 # before the backend has finished its migrations, so keep retrying.
-for _ in $(seq 1 45); do
+for _ in $(seq 1 90); do
   curl -fsS "$API/health" 2>/dev/null | grep -q '"status":"ok"' && break
   sleep 2
 done
-curl -fsS "$API/health" | grep -q '"status":"ok"' || { "${COMPOSE[@]}" logs backend --tail=40; fail "health check"; }
+curl -fsS "$API/health" | grep -q '"status":"ok"' || { [ "$LIVE" = "1" ] || "${COMPOSE[@]}" logs backend --tail=40; fail "health check"; }
 
 step "Signup"
 curl -fsS -X POST "$API/auth/signup" -H "Content-Type: application/json" \

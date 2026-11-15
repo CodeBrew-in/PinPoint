@@ -12,6 +12,8 @@ services:
       MODERATOR_EMAILS: ${MODERATOR_EMAILS:-}
       # Where uploaded photos are stored inside the container (kept in the media_data volume)
       MEDIA_DIR: /app/media
+      # local = files in the media_data volume; db = pictures stored in the database (what Render uses)
+      MEDIA_BACKEND: ${MEDIA_BACKEND:-local}
     volumes:
       - media_data:/app/media
     depends_on:

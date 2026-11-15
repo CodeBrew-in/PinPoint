@@ -12,6 +12,7 @@ before either side codes against the change.
 | 1 | 2026-10-11 | Initial contract: auth (Sprint 1), locations (Sprint 2), create location and photos (Sprint 3) |
 | 2 | 2026-11-02 | **Proposed, needs approval from both.** Adds maps, extra place fields (map, verify, notes, reports), moderators and profile fields. Everything in version 1 still works. See [Version 2 additions](#version-2-additions-proposed). |
 | 3 | 2026-11-15 | **Proposed, needs approval from both.** Pre-deployment hardening: delete routes, account deletion, quotas and rate limits (`429`), sharing only with existing accounts, random default usernames, photo metadata removal, paging. See [Version 3 additions](#version-3-additions-proposed). |
+| 4 | 2026-11-16 | **Proposed, needs approval from both.** Free hosting: photo links are signed and expire (`/api/v1/media/photos/{id}?exp&sig`), the public `/media` folder is removed, `GET /config`, signups can be closed (`403`). See [Version 4 additions](#version-4-additions-proposed). |
 
 ---
 
@@ -343,6 +344,33 @@ Answer `429` with a `Retry-After` header (seconds). The frontend should show "To
 
 - `GET /health` checks the database and answers `503` when it is unreachable.
 - With `APP_ENV=production` the interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are off.
+
+## Version 4 additions (proposed)
+
+Why: a free host has no permanent disk, so photos are stored in the database, and the pre-deployment review
+(SEC-035) asked that a private photo cannot be fetched by anyone who merely has its address.
+
+### Changed: photo links **(changed)**
+
+- A photo's `url` is now a **signed, expiring link**: `/api/v1/media/photos/7?exp=1794787200&sig=<hex>`.
+  It is relative to the API host (the frontend already prefixes the API origin for relative photo URLs).
+- Only people who may see the place receive the link, so there is no login on the photo route itself
+  (an `<img>` tag cannot send one). A link works for 6 to 12 hours and is renewed every time the place is loaded.
+  The frontend must therefore **not store photo URLs**; it must read them from the place each time.
+- `GET /media/photos/{id}` answers `200` with the picture, `403` for a missing, wrong or expired signature (`422` if `exp` or `sig` is missing)
+  and `404` if the photo no longer exists.
+- The old public `/media/photos/<name>` address no longer exists (`404`).
+- Photos are shrunk to at most 1600 pixels on the longest side, and images over 24 megapixels are refused (`415`).
+
+### New: `GET /config`
+
+- **Auth:** none
+- **200:** `{ "signups_open": true }`. The signup page reads this to show "New accounts are closed" before anyone fills in the form.
+
+### Changed: closing signups **(changed)**
+
+- When the server setting `SIGNUPS=closed` is set, `POST /auth/signup` answers **`403`** with
+  `{ "detail": "Signups are closed for now. Please check back later." }`. Signing in is not affected.
 
 ---
 

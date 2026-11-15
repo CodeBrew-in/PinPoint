@@ -68,26 +68,3 @@ def test_moderator_email_variant_does_not_create_a_second_moderator(client, monk
 
     clash = client.post("/api/v1/auth/signup", json={"email": "Mod@pinpoint.com", "password": "password123"})
     assert clash.status_code == 400
-
-
-# ---------- SEC-003: photo file names cannot be guessed ----------
-
-
-def test_photo_file_names_are_not_the_photo_id(client, make_user):
-    owner = make_user()
-    map_id = client.post("/api/v1/maps", json={"title": "Secret map", "visibility": "private"}, headers=owner).json()["id"]
-    place_id = client.post(
-        "/api/v1/locations", json={"name": "Hidden", "lat": 30.3, "lng": 76.4, "map_id": map_id}, headers=owner
-    ).json()["id"]
-    from images import PNG as png
-    photos = [
-        client.post(f"/api/v1/locations/{place_id}/photos", files={"file": ("p.png", png, "image/png")}, headers=owner).json()
-        for _ in range(2)
-    ]
-
-    assert photos[0]["url"] != photos[1]["url"]
-    for photo in photos:
-        stem = photo["url"].rsplit("/", 1)[1].rsplit(".", 1)[0]
-        assert len(stem) >= 20 and stem != str(photo["id"])
-        assert client.get(f"/media/photos/{photo['id']}.png").status_code == 404  # counting 1, 2, 3 finds nothing
-        assert client.get(photo["url"]).content.startswith(b"\x89PNG")  # the real URL still works for people who can see the place

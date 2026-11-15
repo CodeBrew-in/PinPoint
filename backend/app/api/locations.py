@@ -23,7 +23,17 @@ from app.schemas.location import (
     ReportRead,
 )
 from app.services.access import can_view_location, can_view_map
-from app.services.media import MAX_PHOTO_BYTES, ImageRejected, clean_image, delete_photo, extension_for, save_photo
+from app.services.media import (
+    ALLOWED,
+    MAX_PHOTO_BYTES,
+    ImageRejected,
+    clean_image,
+    delete_photo,
+    extension_for,
+    media_backend,
+    save_photo,
+    signed_photo_url,
+)
 from app.services.removal import audit, delete_files, remove_location
 from app.services.serializers import location_out, pin_out, report_out
 
@@ -169,7 +179,7 @@ def upload_photo(
 ):
     location = _visible_location(db, location_id, user)
     _limit("photo", user)
-    if len([p for p in location.photos if p.filename]) >= MAX_PHOTOS_PER_PLACE:
+    if len([p for p in location.photos if p.stored]) >= MAX_PHOTOS_PER_PLACE:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"A place can have at most {MAX_PHOTOS_PER_PLACE} photos",
@@ -189,24 +199,28 @@ def upload_photo(
     except ImageRejected as error:
         raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(error))
 
-    photo = Photo(location_id=location.id, uploaded_by_id=user.id)
+    content_type = next(ct for ct, (ext, _, _) in ALLOWED.items() if ext == extension)
+    photo = Photo(location_id=location.id, uploaded_by_id=user.id, content_type=content_type, size_bytes=len(data))
+    filename = None
+    if media_backend() == "db":
+        photo.data = data  # the picture is stored in the database row
+    else:
+        # An unguessable name on disk; the picture is only ever served through a signed link anyway
+        filename = f"{secrets.token_urlsafe(16)}.{extension}"
+        try:
+            save_photo(filename, data)
+        except OSError:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not store the photo")
+        photo.filename = filename
     db.add(photo)
-    db.flush()  # gives the photo its id
-    # An unguessable name: /media is served without a login, so the name is what keeps private photos private
-    filename = f"{secrets.token_urlsafe(16)}.{extension}"
-    try:
-        save_photo(filename, data)
-    except OSError:
-        db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not store the photo")
-    photo.filename = filename
     _touch(location)
     try:
         db.commit()
     except Exception:
+        db.rollback()
         delete_photo(filename)  # do not leave a file behind that no row points to
         raise
-    return PhotoRead(id=photo.id, url=photo.url)
+    return PhotoRead(id=photo.id, url=signed_photo_url(photo.id))
 
 
 @router.delete("/{location_id}/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)

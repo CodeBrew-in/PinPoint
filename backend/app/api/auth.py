@@ -8,6 +8,7 @@ from app.api.deps import current_user
 from app.core.events import log_event, mask_email
 from app.core.ratelimit import client_ip, hit
 from app.core.roles import is_moderator
+from app.core.settings import signups_open
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.database import get_db
 from app.models.location import Location, Photo
@@ -42,6 +43,8 @@ def _pick_username(db: Session, requested: str | None) -> str:
 
 @router.post("/signup", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def signup(user: UserCreate, request: Request, db: Session = Depends(get_db)):
+    if not signups_open():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Signups are closed for now. Please check back later.")
     hit(f"signup:ip:{client_ip(request)}", limit=10, window_seconds=3600)
 
     existing_user = db.query(User).filter(func.lower(User.email) == user.email).first()

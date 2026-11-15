@@ -4,14 +4,15 @@ import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 
+from app.api.config import router as config_router
 from app.api.health import router as health_router
 from app.api.auth import router as auth_router
 from app.api.locations import router as locations_router
 from app.api.maps import router as maps_router
+from app.api.media import router as media_router
 from app.api.reports import router as reports_router
-from app.services.media import MAX_REQUEST_BYTES, media_root, photos_dir
+from app.services.media import MAX_REQUEST_BYTES
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -67,11 +68,9 @@ async def limit_body_and_add_headers(request: Request, call_next):
 API_PREFIX = "/api/v1"
 
 app.include_router(health_router, prefix=API_PREFIX)
+app.include_router(config_router, prefix=API_PREFIX)
 app.include_router(auth_router, prefix=API_PREFIX)
 app.include_router(maps_router, prefix=API_PREFIX)
 app.include_router(locations_router, prefix=API_PREFIX)
 app.include_router(reports_router, prefix=API_PREFIX)
-
-# Uploaded photos are served from /media/photos/<random name>.<ext> (the Photo url in docs/api-contract.md)
-photos_dir()  # makes sure the folder exists
-app.mount("/media", StaticFiles(directory=media_root()), name="media")
+app.include_router(media_router, prefix=API_PREFIX)

@@ -7,6 +7,7 @@ from app.models.user import User
 from app.schemas.location import LocationPin, LocationRead, NoteRead, PhotoRead, ReportRead
 from app.schemas.map import MapPin, MapRead
 from app.schemas.user import username_of
+from app.services.media import signed_photo_url
 
 MAX_PINS = 12
 
@@ -43,7 +44,7 @@ def location_out(location: Location) -> LocationRead:
         lng=location.lng,
         visibility=location.visibility,
         tags=list(location.tags or []),
-        photos=[PhotoRead(id=p.id, url=p.url) for p in location.photos if p.filename],
+        photos=[PhotoRead(id=p.id, url=signed_photo_url(p.id)) for p in location.photos if p.stored],
         notes=[
             NoteRead(id=n.id, username=username_of(n.user), text=n.text, created_at=n.created_at)
             for n in location.notes
