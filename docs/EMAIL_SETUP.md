@@ -24,6 +24,9 @@ Brevo is free (300 e-mails a day), works over HTTPS, and accepts a Gmail address
    - `EMAIL_FROM` = `thecodebrewcompany@gmail.com`
 5. Save, then do "Part 4: test" below. Mail from a `gmail.com` sender may land in spam at first.
 
+Brevo deletes an API key that is not used for 90 days. If e-mail stops after a quiet period, make a new key
+(**SMTP & API**, **API keys**) and replace `BREVO_API_KEY` in Render.
+
 The Gmail API route below is the alternative.
 
 ---
