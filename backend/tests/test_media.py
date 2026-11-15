@@ -43,7 +43,7 @@ def test_a_link_expires():
 
 
 def test_links_are_stable_inside_a_time_window():
-    now = time.time()
+    now = 1000 * 6 * 3600 + 3600  # one hour into a window, so +60 s never crosses a boundary
 
     assert signed_photo_url(7, now=now) == signed_photo_url(7, now=now + 60)  # so the browser can cache the picture
 
