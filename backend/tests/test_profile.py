@@ -1,3 +1,5 @@
+import re
+
 API = "/api/v1"
 
 
@@ -8,21 +10,21 @@ def signup(client, email, username=None, password="password123"):
     return client.post(f"{API}/auth/signup", json=body)
 
 
-def test_username_defaults_to_the_email_name(client):
+def test_default_username_is_random_and_does_not_reveal_the_email(client):
     user = signup(client, "ananya.rao@pinpoint.com").json()
 
-    assert user["username"] == "ananyarao"  # characters outside letters, digits, _ and - are dropped
+    assert re.fullmatch(r"explorer-\d{6}", user["username"])
+    assert "ananya" not in user["username"]
     assert user["name"] == user["username"]
     assert user["bio"] == ""
     assert user["role"] == "member"
 
 
-def test_default_username_is_made_unique(client):
+def test_default_usernames_are_unique(client):
     first = signup(client, "sam@one.com").json()
     second = signup(client, "sam@two.com").json()
 
-    assert first["username"] == "sam"
-    assert second["username"] == "sam2"
+    assert first["username"] != second["username"]
 
 
 def test_signup_accepts_a_chosen_username(client):

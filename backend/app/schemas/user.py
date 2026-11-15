@@ -74,8 +74,8 @@ class Token(BaseModel):
 
 
 def username_of(user) -> str:
-    """Older accounts have no stored username: fall back to the part of the email before the @."""
-    return user.username or user.email.split("@")[0]
+    """Older accounts have no stored username. Fall back to "user<id>", never to part of the email, which would be public."""
+    return user.username or f"user{user.id}"
 
 
 def user_read(user) -> UserRead:

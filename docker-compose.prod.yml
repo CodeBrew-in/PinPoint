@@ -1,0 +1,72 @@
+# Production stack. Only Caddy is reachable from the internet (ports 80 and 443, with automatic HTTPS).
+#
+#   cp .env.prod.example .env.prod      # then fill in every value
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Backups: scripts/backup.sh. Never run the demo seed (python -m app.seed) here; it refuses anyway.
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env.prod}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+  web:
+    build:
+      context: ./frontend-redesign
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql://pinpoint:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.prod}@postgres:5432/pinpoint
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env.prod}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      MODERATOR_EMAILS: ${MODERATOR_EMAILS:-}
+      FRONTEND_ORIGINS: https://${DOMAIN}
+      MEDIA_DIR: /app/media
+      LOG_LEVEL: INFO
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pinpoint
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: pinpoint
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # No "ports:": the database is only reachable from the backend, inside this Docker network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pinpoint -d pinpoint"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  media_data:
+  caddy_data:
+  caddy_config:

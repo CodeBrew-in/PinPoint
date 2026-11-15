@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Optional
 
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB, as in the contract
+# Whole request limit: one photo plus room for the multipart wrapping
+MAX_REQUEST_BYTES = MAX_PHOTO_BYTES + 512 * 1024
 
 # content type -> (file extension, check on the first bytes of the file)
 ALLOWED = {

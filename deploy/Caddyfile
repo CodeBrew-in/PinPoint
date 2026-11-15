@@ -1,0 +1,16 @@
+# Caddy gets and renews the HTTPS certificate for DOMAIN by itself (the DNS must point at this server).
+{$DOMAIN} {
+	encode gzip
+
+	# Same 6 MB limit as nginx and the API
+	request_body {
+		max_size 6MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	reverse_proxy web:8080
+}
