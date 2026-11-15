@@ -5,6 +5,7 @@ import { SignIn, SignUp } from './pages/Auth';
 import CreateMap from './pages/CreateMap';
 import Explore from './pages/Explore';
 import Landing from './pages/Landing';
+import { Contact, Privacy, Terms } from './pages/Legal';
 import MapView from './pages/MapView';
 import MyMaps from './pages/MyMaps';
 import NotFound from './pages/NotFound';
@@ -20,6 +21,9 @@ export default function App() {
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         {/* Anyone can browse public maps and places. Private maps stay hidden until you are signed in. */}
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="/explore" element={<Explore />} />
         <Route path="/map/:id" element={<MapView />} />
         <Route path="/map/:id/place/:placeId" element={<PlacePage />} />

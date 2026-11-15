@@ -2,9 +2,15 @@
 # Starts the whole stack with Docker Compose and checks that the API works end to end:
 # health, signup, login and /auth/me. Used by CI and safe to run on your own PC.
 #
-#   bash scripts/smoke-test.sh                 # start, test, then remove containers and data
-#   KEEP_STACK=1 bash scripts/smoke-test.sh    # leave the stack (and your data) running afterwards
+#   bash scripts/smoke-test.sh                 # start, test, then remove the test containers and their data
+#   KEEP_STACK=1 bash scripts/smoke-test.sh    # leave the test stack running afterwards
+#
+# It runs as its own Compose project ("pinpoint-smoke"), so "down -v" only ever deletes the test stack's
+# volumes, never your development or production data. It uses the same ports as the dev stack,
+# so stop the dev stack first (docker compose down, without -v).
 set -euo pipefail
+
+COMPOSE=(docker compose -p pinpoint-smoke)
 
 API="${API:-http://localhost:8000/api/v1}"
 WEB="${WEB:-http://localhost:5173}"
@@ -16,7 +22,7 @@ cleanup() {
   if [ "${KEEP_STACK:-0}" = "1" ]; then
     echo "KEEP_STACK=1: leaving the stack running"
   else
-    docker compose down -v
+    "${COMPOSE[@]}" down -v
   fi
 }
 trap cleanup EXIT
@@ -26,11 +32,10 @@ fail() { echo "FAILED: $1" >&2; exit 1; }
 
 # The backend refuses to start without a SECRET_KEY, so give this throw-away stack a random one
 # (openssl or /dev/urandom, not python3: on Windows "python3" can be a Microsoft Store stub that hangs)
-export SECRET_KEY="${SECRET_KEY:-$(openssl rand -hex 32 2>/dev/null || head -c 48 /dev/urandom | od -An -tx1 | tr -d ' 
-')}"
+export SECRET_KEY="${SECRET_KEY:-$(openssl rand -hex 32 2>/dev/null || head -c 48 /dev/urandom | od -An -tx1 | tr -d ' \n')}"
 
 step "Starting the stack"
-docker compose up -d --build --wait
+"${COMPOSE[@]}" up -d --build --wait
 
 step "Backend health (waiting for migrations and startup, up to 90 s)"
 # "docker compose --wait" returns once the containers are running, which can be
@@ -39,7 +44,7 @@ for _ in $(seq 1 45); do
   curl -fsS "$API/health" 2>/dev/null | grep -q '"status":"ok"' && break
   sleep 2
 done
-curl -fsS "$API/health" | grep -q '"status":"ok"' || { docker compose logs backend --tail=40; fail "health check"; }
+curl -fsS "$API/health" | grep -q '"status":"ok"' || { "${COMPOSE[@]}" logs backend --tail=40; fail "health check"; }
 
 step "Signup"
 curl -fsS -X POST "$API/auth/signup" -H "Content-Type: application/json" \
@@ -96,7 +101,8 @@ curl -fsS "$API/locations?bbox=$BOX" -H "$AUTH" | grep -q "Smoke secret" || fail
 
 step "Photo upload accepts a real PNG and rejects a fake one"
 PNG_FILE=".smoke-photo.png"; FAKE_FILE=".smoke-fake.txt"
-printf '\211PNG\r\n\032\n0000000000000000000000000000' > "$PNG_FILE"
+# A real 1x1 PNG: uploads are decoded and re-saved, so a file that only starts like a PNG is refused
+echo 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' | base64 -d > "$PNG_FILE"
 echo "not an image" > "$FAKE_FILE"
 PHOTO_URL=$(curl -fsS -X POST "$API/locations/$PUBLIC_PLACE/photos" -H "$AUTH" -F "file=@$PNG_FILE;type=image/png" \
   | sed -E 's/.*"url":"([^"]+)".*/\1/')
@@ -106,11 +112,23 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/locations/$PUBLIC_PL
 [ "$code" = "415" ] || fail "fake PNG returned $code, expected 415"
 rm -f "$PNG_FILE" "$FAKE_FILE"
 
-step "Verify a place and report it; reports are for moderators only"
-curl -fsS -X POST "$API/locations/$PUBLIC_PLACE/verify" -H "$AUTH" | grep -q '"verified_by"' || fail "verify"
-curl -fsS -X POST "$API/locations/$PUBLIC_PLACE/reports" -H "$AUTH" -H "$JSON" -d '{"kind":"other","note":"smoke"}' | grep -q '"status":"open"' || fail "report"
-code=$(curl -s -o /dev/null -w '%{http_code}' "$API/reports" -H "$AUTH")
+step "A second person verifies and reports the place; authors cannot verify their own"
+EMAIL2="smoke2-$(date +%s)-$RANDOM@pinpoint.com"
+curl -fsS -X POST "$API/auth/signup" -H "$JSON" -d "{\"email\":\"$EMAIL2\",\"password\":\"$PASSWORD\"}" >/dev/null || fail "second signup"
+TOKEN2=$(curl -fsS -X POST "$API/auth/login" -H "$JSON" -d "{\"email\":\"$EMAIL2\",\"password\":\"$PASSWORD\"}" | sed -E 's/.*"access_token":"([^"]+)".*/\1/')
+AUTH2="Authorization: Bearer $TOKEN2"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/locations/$PUBLIC_PLACE/verify" -H "$AUTH")
+[ "$code" = "400" ] || fail "the author verifying their own place returned $code, expected 400"
+curl -fsS -X POST "$API/locations/$PUBLIC_PLACE/verify" -H "$AUTH2" | grep -q '"verified_by"' || fail "verify"
+curl -fsS -X POST "$API/locations/$PUBLIC_PLACE/reports" -H "$AUTH2" -H "$JSON" -d '{"kind":"other","note":"smoke"}' | grep -q '"status":"open"' || fail "report"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$API/reports" -H "$AUTH2")
 [ "$code" = "403" ] || fail "reports list returned $code to a normal user, expected 403"
+
+step "A stranger cannot delete a place; its author can"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$API/locations/$PUBLIC_PLACE" -H "$AUTH2")
+[ "$code" = "403" ] || fail "a stranger deleting a place returned $code, expected 403"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$API/locations/$PRIVATE_PLACE" -H "$AUTH")
+[ "$code" = "204" ] || fail "the author deleting their place returned $code, expected 204"
 # --- end of maps, places, photos and privacy ---
 
 step "Frontend responds"

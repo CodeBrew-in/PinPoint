@@ -11,6 +11,7 @@ before either side codes against the change.
 |---|---|---|
 | 1 | 2026-10-11 | Initial contract: auth (Sprint 1), locations (Sprint 2), create location and photos (Sprint 3) |
 | 2 | 2026-11-02 | **Proposed, needs approval from both.** Adds maps, extra place fields (map, verify, notes, reports), moderators and profile fields. Everything in version 1 still works. See [Version 2 additions](#version-2-additions-proposed). |
+| 3 | 2026-11-15 | **Proposed, needs approval from both.** Pre-deployment hardening: delete routes, account deletion, quotas and rate limits (`429`), sharing only with existing accounts, random default usernames, photo metadata removal, paging. See [Version 3 additions](#version-3-additions-proposed). |
 
 ---
 
@@ -210,7 +211,7 @@ Version 2 keeps the same conventions (integer IDs, UTC timestamps, `lat`/`lng`, 
 { "id": 3, "email": "saneh@example.com", "username": "saneh", "name": "Saneh", "bio": "", "role": "member", "created_at": "2026-10-11T09:30:00Z" }
 ```
 
-- `username`: 3 to 30 characters, letters, digits, `_` and `-`, unique (case-insensitive). If not given at signup, it is the part of the email before `@`, made unique with a number if needed.
+- `username`: 3 to 30 characters, letters, digits, `_` and `-`, unique (case-insensitive). If not given at signup, it is a random `explorer-123456` **(changed in version 3; it used to be made from the email)**.
 - `name`: defaults to `username`. `bio`: up to 180 characters. `role`: `"member"` or `"moderator"`.
 - Moderators are set by the server setting `MODERATOR_EMAILS` (comma-separated emails). There is no admin screen yet.
 
@@ -289,6 +290,59 @@ from the map. When it is missing, `visibility` is required, as in version 1.
 
 Tag suggestions and the "is this a duplicate?" check run in the browser for now, using the places already
 fetched. They move to the server (embeddings and PostGIS) in a later version.
+
+## Version 3 additions (proposed)
+
+Why: the pre-deployment security review (November 2026) found that nobody could remove content, that limits
+were missing, and that some rules could be abused. Version 3 keeps every version 2 route and field; the rules
+marked **(changed)** are stricter.
+
+### New endpoints
+
+| Method and path | Auth | What it does |
+|---|---|---|
+| `DELETE /maps/{id}` | required, owner | Deletes the map and **every place on it** (also places other people added) with their photos. `204`. |
+| `DELETE /locations/{id}` | required | The place's author, the owner of its map, or a moderator. Deletes it with its photos; its open reports are closed. `204`, `403` for anyone else. |
+| `DELETE /locations/{id}/photos/{photo_id}` | required | The uploader, the place's author, the map owner or a moderator. `204`. |
+| `DELETE /locations/{id}/notes/{note_id}` | required | The note's author, the place's author, the map owner or a moderator. `204`. |
+| `DELETE /auth/me` | required | Body `{ "password" }`. Deletes the account and what it owns: its maps (with all places on them), its places, the photos it uploaded, its notes and reports, and shares made to its address. `204`, `401` for a wrong password. |
+
+Every deletion is written to an audit log on the server (who, what, when).
+
+### Changed rules **(changed)**
+
+- **Sharing:** `POST /maps/{id}/shares` only accepts an email that already has an account; otherwise `400`
+  ("No PinPoint account uses that email"). E-mails are not verified, so sharing with an unused address would
+  let whoever registers it first read the map.
+- **Moderator addresses:** `POST /auth/signup` answers `400` "Email already registered" for an address listed in
+  `MODERATOR_EMAILS`. The account must exist before the address is listed.
+- **Verify:** `POST /locations/{id}/verify` answers `400` when the caller added the place. Verifying again changes nothing.
+- **Reports:** one open report per person per place; a second answers `400` "You already reported this place".
+- **Photos:** at most 10 per place (`422` after that). Every upload is decoded and re-saved without its
+  metadata (GPS position, time, camera), so stored files are not byte-identical to the upload. A file that
+  only starts like an image, or unpacks to more than 40 megapixels, answers `415`. A request body over
+  5.5 MB answers `413` before it is read.
+- **Passwords:** 8 to 128 characters.
+- **Paging:** `GET /maps` takes `limit` (default 100, max 200) and `offset`; `GET /maps/{id}/locations` takes
+  `limit` (default 500, max 500) and `offset`; `GET /reports` takes `limit` (default 100, max 200) and `offset`.
+- **Search:** `%` and `_` in `q` match literally.
+
+### Rate limits
+
+Answer `429` with a `Retry-After` header (seconds). The frontend should show "Too many attempts, try again later".
+
+| Action | Limit |
+|---|---|
+| Login | 10 per email and 30 per IP address per 15 minutes |
+| Signup | 10 per IP address per hour |
+| New place / photo / note / report / map | 60 / 60 / 30 / 20 / 20 per user per hour |
+| Share a map | 30 per user per hour |
+| Delete account | 5 attempts per user per 15 minutes |
+
+### Other server behaviour
+
+- `GET /health` checks the database and answers `503` when it is unreachable.
+- With `APP_ENV=production` the interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are off.
 
 ---
 

@@ -7,13 +7,19 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 5
 
+  # frontend-redesign is the frontend that ships; the old frontend/ is not watched any more
   - package-ecosystem: npm
-    directory: /frontend
+    directory: /frontend-redesign
     target-branch: develop
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Wait a few days after a release before proposing it, so a hijacked package version is usually caught first
+    cooldown:
+      default-days: 5
 
   - package-ecosystem: github-actions
     directory: /
@@ -28,7 +34,7 @@ updates:
       interval: weekly
 
   - package-ecosystem: docker
-    directory: /frontend
+    directory: /frontend-redesign
     target-branch: develop
     schedule:
       interval: weekly

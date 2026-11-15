@@ -200,6 +200,44 @@ export async function addPhoto(mapId: string, placeId: number, photo: string) {
   commit(withPlace(s, mapId, placeId, (p) => ({ ...p, photos: [...p.photos, photo] })));
 }
 
+/** Deletes the account and everything it owns (its maps, places and photos). Needs the password. */
+export async function deleteAccount(password: string) {
+  if (USE_API) return remote.deleteAccount(password);
+  const s = getState();
+  const user = requireUser(s);
+  if (!(await verifyPassword(password, user.passHash))) throw new Error('Wrong password.');
+  commit({
+    ...s,
+    users: s.users.filter((u) => u.id !== user.id),
+    maps: s.maps.filter((m) => m.ownerId !== user.id).map((m) => ({ ...m, places: m.places.filter((p) => p.addedBy !== user.username) })),
+    sessionUserId: null,
+  });
+}
+
+/** The author, the owner of the map, or a moderator can delete a place. */
+export async function deletePlace(mapId: string, placeId: number) {
+  if (USE_API) return remote.deletePlace(mapId, placeId);
+  const s = getState();
+  const user = requireUser(s);
+  const map = writableMap(s, mapId);
+  const place = map.places.find((p) => p.id === placeId);
+  if (!place) throw new Error('Place not found.');
+  if (place.addedBy !== user.username && map.ownerId !== user.id && user.role !== 'moderator') {
+    throw new Error('Only the author, the map owner or a moderator can delete this place.');
+  }
+  commit(withMap(s, mapId, (m) => ({ ...m, updated: today(), places: m.places.filter((p) => p.id !== placeId) })));
+}
+
+/** The owner deletes a map with every place on it. */
+export async function deleteMap(mapId: string) {
+  if (USE_API) return remote.deleteMap(mapId);
+  const s = getState();
+  const user = requireUser(s);
+  const map = writableMap(s, mapId);
+  if (map.ownerId !== user.id) throw new Error('Only the owner can delete a map.');
+  commit({ ...s, maps: s.maps.filter((m) => m.id !== mapId) });
+}
+
 export async function verifyPlace(mapId: string, placeId: number) {
   if (USE_API) return remote.verifyPlace(mapId, placeId);
   const s = getState();

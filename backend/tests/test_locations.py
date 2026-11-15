@@ -1,8 +1,6 @@
 API = "/api/v1"
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
-JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
-WEBP = b"RIFF\x00\x00\x00\x00WEBP" + b"\x00" * 32
+from images import JPEG, PNG, WEBP
 
 
 def new_map(client, headers, visibility="public", title="A map"):
@@ -174,7 +172,7 @@ def test_upload_photo_and_fetch_the_file(client, make_user):
     assert response.status_code == 201
     photo = response.json()
     assert photo["url"].startswith("/media/photos/") and photo["url"].endswith(".png")
-    assert client.get(photo["url"]).content == PNG
+    assert client.get(photo["url"]).content.startswith(b"\x89PNG")  # re-saved without metadata
     assert client.get(f"{API}/locations/{place_id}").json()["photos"] == [photo]
 
 

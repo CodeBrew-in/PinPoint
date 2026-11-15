@@ -25,8 +25,15 @@ env:
 jobs:
   publish:
     name: Build and publish ${{ matrix.image }}
-    # Never publish an image from a commit whose CI run failed
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # Publish only when CI passed for a push to main in THIS repository.
+    # workflow_run also fires for pull requests from forks whose branch happens to be called "main";
+    # their code must never be built and published with this repository's package permissions.
+    if: >-
+      github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' ||
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -35,31 +42,33 @@ jobs:
           - image: backend
             context: backend
             dockerfile: backend/Dockerfile
-          - image: frontend
-            context: frontend
-            dockerfile: frontend/Dockerfile.prod
+          - image: web
+            context: frontend-redesign
+            dockerfile: frontend-redesign/Dockerfile.prod
     steps:
-      - uses: actions/checkout@v4
+      # Actions are pinned to full commit SHAs (the comment shows the version)
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}
           tags: |
             type=raw,value=${{ github.event.workflow_run.head_sha || github.sha }}
             type=raw,value=latest
 
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}

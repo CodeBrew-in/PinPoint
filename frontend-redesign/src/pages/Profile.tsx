@@ -5,7 +5,7 @@ import { FieldCard } from '../components/FieldCard';
 import { Input } from '../components/Input';
 import { useSession } from '../components/Layout';
 import { PasswordField } from '../components/PasswordField';
-import { changePassword, updateProfile } from '../store/api';
+import { changePassword, deleteAccount, updateProfile } from '../store/api';
 import { USE_API } from '../lib/http';
 import { resetDemoData } from '../store/store';
 
@@ -21,6 +21,9 @@ export default function Profile() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   if (!user) return null;
 
@@ -92,6 +95,37 @@ export default function Profile() {
           />
           {pwMsg && <p role={pwMsg.ok ? 'status' : 'alert'} className={`text-sm font-bold ${pwMsg.ok ? '' : 'text-danger'}`}>{pwMsg.text}</p>}
           <div><Button type="submit">Change password</Button></div>
+        </FieldCard>
+      </form>
+
+      <form
+        className="mt-6"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!window.confirm('Delete your account for good? Your maps, places and photos are deleted with it, and this cannot be undone.')) return;
+          try {
+            await deleteAccount(deletePassword);
+            navigate('/');
+          } catch (err) {
+            setDeleteError(err instanceof Error ? err.message : 'Could not delete the account.');
+          }
+        }}
+      >
+        <FieldCard className="flex flex-col gap-4">
+          <h2 className="text-2xl">Delete account</h2>
+          <p className="text-sm">
+            This deletes your account and everything you own: your maps (with every place on them, also places other people
+            added), your places and the photos and notes you added. It cannot be undone.
+          </p>
+          <Input
+            label="Your password"
+            type="password"
+            autoComplete="current-password"
+            value={deletePassword}
+            onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(''); }}
+          />
+          {deleteError && <p role="alert" className="text-sm font-bold text-danger">{deleteError}</p>}
+          <div><Button type="submit" className="text-danger" disabled={!deletePassword}>Delete my account</Button></div>
         </FieldCard>
       </form>
 

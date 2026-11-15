@@ -16,7 +16,7 @@ def _lower_email(value: str) -> str:
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=8, max_length=128)
     username: Optional[str] = None
 
     _lower_email = field_validator("email")(_lower_email)
@@ -68,14 +68,20 @@ class UserRead(BaseModel):
     created_at: UTCDateTime
 
 
+class AccountDelete(BaseModel):
+    """Deleting an account needs the password again, so a stolen login token alone cannot do it."""
+
+    password: str
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
 
 def username_of(user) -> str:
-    """Older accounts have no stored username: fall back to the part of the email before the @."""
-    return user.username or user.email.split("@")[0]
+    """Older accounts have no stored username. Fall back to "user<id>", never to part of the email, which would be public."""
+    return user.username or f"user{user.id}"
 
 
 def user_read(user) -> UserRead:
