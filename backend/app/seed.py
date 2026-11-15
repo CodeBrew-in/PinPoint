@@ -7,6 +7,7 @@ Place names and coordinates are real Patiala locations from OpenStreetMap; the d
 Both accounts use the password below. marcus@example.com is a moderator when MODERATOR_EMAILS lists him
 (docker-compose.yml does by default).
 """
+import os
 from datetime import datetime
 
 from app.core.security import hash_password
@@ -61,6 +62,9 @@ MAPS = [
 
 
 def seed() -> str:
+    # Demo accounts with a published password must never exist on a real server
+    if os.getenv("APP_ENV", "").strip().lower() == "production":
+        raise SystemExit("Refusing to load demo data: APP_ENV is production.")
     db = SessionLocal()
     try:
         if db.query(User).filter(User.email == "marcus@example.com").first():
@@ -75,6 +79,7 @@ def seed() -> str:
                 username=username,
                 name=name,
                 bio="Demo account.",
+                email_verified_at=now,  # demo accounts work even when e-mail verification is required
             )
             db.add(user)
             users[username] = user

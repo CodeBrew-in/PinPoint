@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { signOut } from '../store/api';
+import { USE_API } from '../lib/http';
+import { resendVerification, signOut } from '../store/api';
 import { sessionUser } from '../store/helpers';
 import { useAppState, useAuthReady } from '../store/store';
 import { Wordmark } from './Art';
@@ -21,6 +22,35 @@ export function RequireAuth() {
   if (!ready) return <Loading />;
   if (!user) return <Navigate to="/signin" state={{ from: location.pathname }} replace />;
   return <Outlet />;
+}
+
+/** Asks a signed-in person to open the link we e-mailed them. Only with the real backend, and only until they have. */
+function ConfirmEmailBanner() {
+  const user = useSession();
+  const [note, setNote] = useState('');
+  if (!USE_API || !user || user.emailVerified !== false) return null;
+
+  return (
+    <div role="status" className="border-b-2 border-ink bg-orange/20 px-5 py-2 text-sm md:px-10">
+      <span className="font-bold">Please confirm your e-mail address.</span> We sent a link to {user.email}. Until you open it you can
+      look around but not add maps or places.{' '}
+      <button
+        type="button"
+        className="font-bold underline"
+        onClick={async () => {
+          try {
+            await resendVerification();
+            setNote('Sent. Check your inbox and spam folder.');
+          } catch (e) {
+            setNote(e instanceof Error ? e.message : 'Could not send the link.');
+          }
+        }}
+      >
+        Send the link again
+      </button>
+      {note && <span className="ml-2 font-bold">{note}</span>}
+    </div>
+  );
 }
 
 export function Layout() {
@@ -109,9 +139,18 @@ export function Layout() {
           </div>
         )}
       </header>
+      <ConfirmEmailBanner />
       <main className="flex-1">
         <Outlet />
       </main>
+      <footer className="border-t-2 border-ink bg-page">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-5 py-4 text-sm md:px-10">
+          <span className="font-medium">PinPoint</span>
+          <NavLink to="/privacy" className="hover:underline">Privacy</NavLink>
+          <NavLink to="/terms" className="hover:underline">Terms</NavLink>
+          <NavLink to="/contact" className="hover:underline">Contact</NavLink>
+        </div>
+      </footer>
     </div>
   );
 }

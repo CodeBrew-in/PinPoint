@@ -6,3 +6,19 @@ __pycache__/
 
 # Uploaded photos (local development)
 backend/media/
+
+# Local security audit reports, never commit these
+security-reports/
+
+# Environment files with real values (the *.example files are templates and are committed)
+.env.*
+!.env.example
+!.env.prod.example
+
+# Keys, certificates and database backups
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+backups/

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../components/Button';
+import { DeleteMapButton } from '../components/DeleteMapButton';
 import { Chip } from '../components/Chip';
 import { useSession } from '../components/Layout';
 import { FieldCard } from '../components/FieldCard';
@@ -64,6 +65,7 @@ function EmptyMap({ map, owner }: { map: MapData; owner: string }) {
       <div className="mt-6">
         <Button variant="primary" className="text-xl" onClick={() => navigate(`/map/${map.id}/add`)}>Add a place</Button>
       </div>
+      <div className="mt-6 flex justify-center"><DeleteMapButton map={map} /></div>
     </div>
   );
 }
@@ -145,6 +147,7 @@ function MapWithPlaces({ map, owner, contributors }: { map: MapData; owner: stri
             </li>
           ))}
         </ul>
+        <DeleteMapButton map={map} />
       </aside>
 
       <section className="relative isolate h-full">

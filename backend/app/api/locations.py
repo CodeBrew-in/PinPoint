@@ -1,11 +1,14 @@
+import secrets
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.api.deps import current_user, optional_user
+from app.api.deps import current_user, optional_user, verified_user
+from app.core.ratelimit import hit
+from app.core.roles import has_moderator_role
 from app.db.database import get_db
 from app.models.location import Location, LocationNote, Photo, Report
 from app.models.map import Map, MapShare
@@ -20,12 +23,33 @@ from app.schemas.location import (
     ReportRead,
 )
 from app.services.access import can_view_location, can_view_map
-from app.services.media import MAX_PHOTO_BYTES, delete_photo, extension_for, save_photo
+from app.services.media import (
+    ALLOWED,
+    MAX_PHOTO_BYTES,
+    ImageRejected,
+    clean_image,
+    delete_photo,
+    extension_for,
+    media_backend,
+    save_photo,
+    signed_photo_url,
+)
+from app.services.removal import audit, delete_files, remove_location
 from app.services.serializers import location_out, pin_out, report_out
 
 router = APIRouter(prefix="/locations", tags=["locations"])
 
 MAX_PINS = 500
+MAX_PHOTOS_PER_PLACE = 10
+
+# Per-user limits for actions that create content (count, per number of seconds)
+HOURLY = 3600
+LIMITS = {"place": (60, HOURLY), "photo": (60, HOURLY), "note": (30, HOURLY), "report": (20, HOURLY)}
+
+
+def _limit(kind: str, user: User) -> None:
+    count, window = LIMITS[kind]
+    hit(f"{kind}:user:{user.id}", limit=count, window_seconds=window)
 
 
 def _visible_location(db: Session, location_id: int, user: Optional[User]) -> Location:
@@ -34,6 +58,15 @@ def _visible_location(db: Session, location_id: int, user: Optional[User]) -> Lo
     if location is None or not can_view_location(location, user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
     return location
+
+
+def _can_manage(location: Location, user: User) -> bool:
+    """The place's author, the owner of the map it is on, or a moderator may remove it and its photos and notes."""
+    if location.owner_id == user.id:
+        return True
+    if location.map is not None and location.map.owner_id == user.id:
+        return True
+    return has_moderator_role(user)
 
 
 def _touch(location: Location) -> None:
@@ -89,7 +122,8 @@ def list_locations(
 
 
 @router.post("", response_model=LocationRead, status_code=status.HTTP_201_CREATED)
-def create_location(body: LocationCreate, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def create_location(body: LocationCreate, db: Session = Depends(get_db), user: User = Depends(verified_user)):
+    _limit("place", user)
     map_ = None
     if body.map_id is not None:
         map_ = db.query(Map).filter(Map.id == body.map_id).first()
@@ -122,17 +156,37 @@ def get_location(location_id: int, db: Session = Depends(get_db), user: Optional
     return location_out(_visible_location(db, location_id, user))
 
 
+@router.delete("/{location_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_location(location_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    location = _visible_location(db, location_id, user)
+    if not _can_manage(location, user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the author, the map owner or a moderator can do this")
+    audit(db, user, "place_deleted", "place", location.id, f"{location.name} (author {location.owner_id})")
+    files = remove_location(db, location, user)
+    db.commit()
+    delete_files(files)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# A plain "def" (not async): reading the file and re-saving the image is blocking work,
+# so FastAPI runs it in a worker thread instead of on the event loop.
 @router.post("/{location_id}/photos", response_model=PhotoRead, status_code=status.HTTP_201_CREATED)
-async def upload_photo(
+def upload_photo(
     location_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: User = Depends(current_user),
+    user: User = Depends(verified_user),
 ):
     location = _visible_location(db, location_id, user)
+    _limit("photo", user)
+    if len([p for p in location.photos if p.stored]) >= MAX_PHOTOS_PER_PLACE:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"A place can have at most {MAX_PHOTOS_PER_PLACE} photos",
+        )
 
     # Read one byte past the limit, so a file that is too big is noticed without loading all of it.
-    data = await file.read(MAX_PHOTO_BYTES + 1)
+    data = file.file.read(MAX_PHOTO_BYTES + 1)
     if len(data) > MAX_PHOTO_BYTES:
         raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail="Photo is larger than 5 MB")
     extension = extension_for(file.content_type, data)
@@ -140,27 +194,60 @@ async def upload_photo(
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Only JPEG, PNG or WebP photos are allowed"
         )
-
-    photo = Photo(location_id=location.id, uploaded_by_id=user.id)
-    db.add(photo)
-    db.flush()  # gives the photo its id, which becomes the file name
-    filename = f"{photo.id}.{extension}"
     try:
-        save_photo(filename, data)
-    except OSError:
+        data = clean_image(extension, data)  # removes GPS position, time and camera details
+    except ImageRejected as error:
+        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(error))
+
+    content_type = next(ct for ct, (ext, _, _) in ALLOWED.items() if ext == extension)
+    photo = Photo(location_id=location.id, uploaded_by_id=user.id, content_type=content_type, size_bytes=len(data))
+    filename = None
+    if media_backend() == "db":
+        photo.data = data  # the picture is stored in the database row
+    else:
+        # An unguessable name on disk; the picture is only ever served through a signed link anyway
+        filename = f"{secrets.token_urlsafe(16)}.{extension}"
+        try:
+            save_photo(filename, data)
+        except OSError:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not store the photo")
+        photo.filename = filename
+    db.add(photo)
+    _touch(location)
+    try:
+        db.commit()
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not store the photo")
-    photo.filename = filename
+        delete_photo(filename)  # do not leave a file behind that no row points to
+        raise
+    return PhotoRead(id=photo.id, url=signed_photo_url(photo.id))
+
+
+@router.delete("/{location_id}/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_location_photo(
+    location_id: int, photo_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)
+):
+    location = _visible_location(db, location_id, user)
+    photo = next((p for p in location.photos if p.id == photo_id), None)
+    if photo is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
+    if photo.uploaded_by_id != user.id and not _can_manage(location, user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the uploader, the place's author, the map owner or a moderator can do this")
+    audit(db, user, "photo_deleted", "photo", photo.id, f"from place {location.id}")
+    filename = photo.filename
+    location.photos.remove(photo)
     _touch(location)
     db.commit()
-    return PhotoRead(id=photo.id, url=photo.url)
+    delete_photo(filename)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{location_id}/notes", response_model=LocationRead, status_code=status.HTTP_201_CREATED)
 def add_note(
-    location_id: int, body: NoteCreate, db: Session = Depends(get_db), user: User = Depends(current_user)
+    location_id: int, body: NoteCreate, db: Session = Depends(get_db), user: User = Depends(verified_user)
 ):
     location = _visible_location(db, location_id, user)
+    _limit("note", user)
     location.notes.append(LocationNote(user_id=user.id, text=body.text))
     _touch(location)
     db.commit()
@@ -168,22 +255,48 @@ def add_note(
     return location_out(location)
 
 
-@router.post("/{location_id}/verify", response_model=LocationRead)
-def verify_location(location_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+@router.delete("/{location_id}/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_note(location_id: int, note_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     location = _visible_location(db, location_id, user)
-    location.verified_at = datetime.utcnow()
-    location.verified_by_id = user.id
+    note = next((n for n in location.notes if n.id == note_id), None)
+    if note is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+    if note.user_id != user.id and not _can_manage(location, user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the note's author, the place's author, the map owner or a moderator can do this")
+    audit(db, user, "note_deleted", "note", note.id, f"from place {location.id}")
+    location.notes.remove(note)
     _touch(location)
     db.commit()
-    db.refresh(location)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{location_id}/verify", response_model=LocationRead)
+def verify_location(location_id: int, db: Session = Depends(get_db), user: User = Depends(verified_user)):
+    location = _visible_location(db, location_id, user)
+    if location.owner_id == user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot verify a place you added")
+    if location.verified_by_id != user.id:  # verifying again changes nothing
+        location.verified_at = datetime.utcnow()
+        location.verified_by_id = user.id
+        _touch(location)
+        db.commit()
+        db.refresh(location)
     return location_out(location)
 
 
 @router.post("/{location_id}/reports", response_model=ReportRead, status_code=status.HTTP_201_CREATED)
 def report_location(
-    location_id: int, body: ReportCreate, db: Session = Depends(get_db), user: User = Depends(current_user)
+    location_id: int, body: ReportCreate, db: Session = Depends(get_db), user: User = Depends(verified_user)
 ):
     location = _visible_location(db, location_id, user)
+    _limit("report", user)
+    already = (
+        db.query(Report)
+        .filter(Report.location_id == location.id, Report.reporter_id == user.id, Report.status == "open")
+        .first()
+    )
+    if already is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already reported this place")
     report = Report(
         location_id=location.id,
         place_name=location.name,
@@ -196,13 +309,3 @@ def report_location(
     db.commit()
     db.refresh(report)
     return report_out(report)
-
-
-def remove_location_files(location: Location) -> list[str]:
-    """File names of a place's photos, collected before the place is deleted."""
-    return [p.filename for p in location.photos if p.filename]
-
-
-def delete_files(filenames: list[str]) -> None:
-    for name in filenames:
-        delete_photo(name)

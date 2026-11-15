@@ -10,6 +10,8 @@ export interface User {
   passHash: string;
   bio: string;
   role: Role;
+  /** Only known with the real backend: false until the person opens the link e-mailed to them. */
+  emailVerified?: boolean;
 }
 
 export interface Place {

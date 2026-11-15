@@ -6,12 +6,14 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://pinpoint:pinpoint@postgres:5432/pinpoint
-      SECRET_KEY: ${SECRET_KEY:-dev-only-insecure-secret-key-change-me-in-env}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
       # Comma-separated emails that get the moderator role (empty = nobody)
       MODERATOR_EMAILS: ${MODERATOR_EMAILS:-}
       # Where uploaded photos are stored inside the container (kept in the media_data volume)
       MEDIA_DIR: /app/media
+      # local = files in the media_data volume; db = pictures stored in the database (what Render uses)
+      MEDIA_BACKEND: ${MEDIA_BACKEND:-local}
     volumes:
       - media_data:/app/media
     depends_on:

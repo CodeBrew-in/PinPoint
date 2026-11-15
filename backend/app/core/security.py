@@ -10,8 +10,18 @@ load_dotenv()
 
 password_hash = PasswordHash.recommended()
 
-# Set a long random SECRET_KEY in .env for anything beyond local development
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-insecure-secret-key-change-me-in-env")
+def load_secret_key() -> str:
+    """The JWT signing key from SECRET_KEY. There is no default: anyone could forge logins with a key in the source."""
+    key = os.getenv("SECRET_KEY", "")
+    if len(key) < 32:
+        raise RuntimeError(
+            "SECRET_KEY is missing or shorter than 32 characters. Put a random value in .env "
+            '(python -c "import secrets; print(secrets.token_urlsafe(48))").'
+        )
+    return key
+
+
+SECRET_KEY = load_secret_key()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 

@@ -1,8 +1,6 @@
 API = "/api/v1"
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
-JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
-WEBP = b"RIFF\x00\x00\x00\x00WEBP" + b"\x00" * 32
+from images import JPEG, PNG, WEBP
 
 
 def new_map(client, headers, visibility="public", title="A map"):
@@ -173,8 +171,8 @@ def test_upload_photo_and_fetch_the_file(client, make_user):
 
     assert response.status_code == 201
     photo = response.json()
-    assert photo["url"] == f"/media/photos/{photo['id']}.png"
-    assert client.get(photo["url"]).content == PNG
+    assert photo["url"].startswith("/api/v1/media/photos/") and "sig=" in photo["url"]
+    assert client.get(photo["url"]).content.startswith(b"\x89PNG")  # re-saved without metadata
     assert client.get(f"{API}/locations/{place_id}").json()["photos"] == [photo]
 
 
@@ -182,8 +180,11 @@ def test_jpeg_and_webp_are_accepted(client, make_user):
     owner = make_user()
     place_id = new_place(client, owner, visibility="public").json()["id"]
 
-    assert upload(client, owner, place_id, JPEG, "image/jpeg", "a.jpg").json()["url"].endswith(".jpg")
-    assert upload(client, owner, place_id, WEBP, "image/webp", "a.webp").json()["url"].endswith(".webp")
+    jpeg = upload(client, owner, place_id, JPEG, "image/jpeg", "a.jpg").json()
+    webp = upload(client, owner, place_id, WEBP, "image/webp", "a.webp").json()
+
+    assert client.get(jpeg["url"]).headers["content-type"] == "image/jpeg"
+    assert client.get(webp["url"]).headers["content-type"] == "image/webp"
 
 
 def test_photo_rules(client, make_user):

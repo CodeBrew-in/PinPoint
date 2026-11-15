@@ -11,6 +11,9 @@ before either side codes against the change.
 |---|---|---|
 | 1 | 2026-10-11 | Initial contract: auth (Sprint 1), locations (Sprint 2), create location and photos (Sprint 3) |
 | 2 | 2026-11-02 | **Proposed, needs approval from both.** Adds maps, extra place fields (map, verify, notes, reports), moderators and profile fields. Everything in version 1 still works. See [Version 2 additions](#version-2-additions-proposed). |
+| 3 | 2026-11-15 | **Proposed, needs approval from both.** Pre-deployment hardening: delete routes, account deletion, quotas and rate limits (`429`), sharing only with existing accounts, random default usernames, photo metadata removal, paging. See [Version 3 additions](#version-3-additions-proposed). |
+| 4 | 2026-11-16 | **Proposed, needs approval from both.** Free hosting: photo links are signed and expire (`/api/v1/media/photos/{id}?exp&sig`), the public `/media` folder is removed, `GET /config`, signups can be closed (`403`). See [Version 4 additions](#version-4-additions-proposed). |
+| 5 | 2026-11-16 | **Proposed, needs approval from both.** E-mail: confirm an address, forgotten password, and the confirmed-e-mail rule. See [Version 5 additions](#version-5-additions-proposed). |
 
 ---
 
@@ -210,7 +213,7 @@ Version 2 keeps the same conventions (integer IDs, UTC timestamps, `lat`/`lng`, 
 { "id": 3, "email": "saneh@example.com", "username": "saneh", "name": "Saneh", "bio": "", "role": "member", "created_at": "2026-10-11T09:30:00Z" }
 ```
 
-- `username`: 3 to 30 characters, letters, digits, `_` and `-`, unique (case-insensitive). If not given at signup, it is the part of the email before `@`, made unique with a number if needed.
+- `username`: 3 to 30 characters, letters, digits, `_` and `-`, unique (case-insensitive). If not given at signup, it is a random `explorer-123456` **(changed in version 3; it used to be made from the email)**.
 - `name`: defaults to `username`. `bio`: up to 180 characters. `role`: `"member"` or `"moderator"`.
 - Moderators are set by the server setting `MODERATOR_EMAILS` (comma-separated emails). There is no admin screen yet.
 
@@ -289,6 +292,115 @@ from the map. When it is missing, `visibility` is required, as in version 1.
 
 Tag suggestions and the "is this a duplicate?" check run in the browser for now, using the places already
 fetched. They move to the server (embeddings and PostGIS) in a later version.
+
+## Version 3 additions (proposed)
+
+Why: the pre-deployment security review (November 2026) found that nobody could remove content, that limits
+were missing, and that some rules could be abused. Version 3 keeps every version 2 route and field; the rules
+marked **(changed)** are stricter.
+
+### New endpoints
+
+| Method and path | Auth | What it does |
+|---|---|---|
+| `DELETE /maps/{id}` | required, owner | Deletes the map and **every place on it** (also places other people added) with their photos. `204`. |
+| `DELETE /locations/{id}` | required | The place's author, the owner of its map, or a moderator. Deletes it with its photos; its open reports are closed. `204`, `403` for anyone else. |
+| `DELETE /locations/{id}/photos/{photo_id}` | required | The uploader, the place's author, the map owner or a moderator. `204`. |
+| `DELETE /locations/{id}/notes/{note_id}` | required | The note's author, the place's author, the map owner or a moderator. `204`. |
+| `DELETE /auth/me` | required | Body `{ "password" }`. Deletes the account and what it owns: its maps (with all places on them), its places, the photos it uploaded, its notes and reports, and shares made to its address. `204`, `401` for a wrong password. |
+
+Every deletion is written to an audit log on the server (who, what, when).
+
+### Changed rules **(changed)**
+
+- **Sharing:** `POST /maps/{id}/shares` only accepts an email that already has an account; otherwise `400`
+  ("No PinPoint account uses that email"). E-mails are not verified, so sharing with an unused address would
+  let whoever registers it first read the map.
+- **Moderator addresses:** `POST /auth/signup` answers `400` "Email already registered" for an address listed in
+  `MODERATOR_EMAILS`. The account must exist before the address is listed.
+- **Verify:** `POST /locations/{id}/verify` answers `400` when the caller added the place. Verifying again changes nothing.
+- **Reports:** one open report per person per place; a second answers `400` "You already reported this place".
+- **Photos:** at most 10 per place (`422` after that). Every upload is decoded and re-saved without its
+  metadata (GPS position, time, camera), so stored files are not byte-identical to the upload. A file that
+  only starts like an image, or unpacks to more than 40 megapixels, answers `415`. A request body over
+  5.5 MB answers `413` before it is read.
+- **Passwords:** 8 to 128 characters.
+- **Paging:** `GET /maps` takes `limit` (default 100, max 200) and `offset`; `GET /maps/{id}/locations` takes
+  `limit` (default 500, max 500) and `offset`; `GET /reports` takes `limit` (default 100, max 200) and `offset`.
+- **Search:** `%` and `_` in `q` match literally.
+
+### Rate limits
+
+Answer `429` with a `Retry-After` header (seconds). The frontend should show "Too many attempts, try again later".
+
+| Action | Limit |
+|---|---|
+| Login | 10 per email and 30 per IP address per 15 minutes |
+| Signup | 10 per IP address per hour |
+| New place / photo / note / report / map | 60 / 60 / 30 / 20 / 20 per user per hour |
+| Share a map | 30 per user per hour |
+| Delete account | 5 attempts per user per 15 minutes |
+
+### Other server behaviour
+
+- `GET /health` checks the database and answers `503` when it is unreachable.
+- With `APP_ENV=production` the interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are off.
+
+## Version 4 additions (proposed)
+
+Why: a free host has no permanent disk, so photos are stored in the database, and the pre-deployment review
+(SEC-035) asked that a private photo cannot be fetched by anyone who merely has its address.
+
+### Changed: photo links **(changed)**
+
+- A photo's `url` is now a **signed, expiring link**: `/api/v1/media/photos/7?exp=1794787200&sig=<hex>`.
+  It is relative to the API host (the frontend already prefixes the API origin for relative photo URLs).
+- Only people who may see the place receive the link, so there is no login on the photo route itself
+  (an `<img>` tag cannot send one). A link works for 6 to 12 hours and is renewed every time the place is loaded.
+  The frontend must therefore **not store photo URLs**; it must read them from the place each time.
+- `GET /media/photos/{id}` answers `200` with the picture, `403` for a missing, wrong or expired signature (`422` if `exp` or `sig` is missing)
+  and `404` if the photo no longer exists.
+- The old public `/media/photos/<name>` address no longer exists (`404`).
+- Photos are shrunk to at most 1600 pixels on the longest side, and images over 24 megapixels are refused (`415`).
+
+### New: `GET /config`
+
+- **Auth:** none
+- **200:** `{ "signups_open": true }`. The signup page reads this to show "New accounts are closed" before anyone fills in the form.
+
+### Changed: closing signups **(changed)**
+
+- When the server setting `SIGNUPS=closed` is set, `POST /auth/signup` answers **`403`** with
+  `{ "detail": "Signups are closed for now. Please check back later." }`. Signing in is not affected.
+
+## Version 5 additions (proposed)
+
+Why: e-mail addresses were never confirmed (SEC-034), and a forgotten password could not be recovered.
+E-mail is optional on the server: with no e-mail provider set up, none of this is active and everything behaves as in version 4.
+
+### New field and endpoints
+
+`User` gains `email_verified` (boolean). It is `false` until the person opens the link e-mailed to them.
+
+| Method and path | Auth | What it does |
+|---|---|---|
+| `POST /auth/verify-email` | none | Body `{ "token" }`. The token comes from the link in the e-mail. Returns `User`. `400` "This link is invalid or has expired" if the token is unknown, used or older than 24 hours. |
+| `POST /auth/resend-verification` | required | Sends a new link; older unused links stop working. `202`. `503` if e-mail is not set up. Limit: 3 per hour. |
+| `POST /auth/forgot-password` | none | Body `{ "email" }`. **Always `202`** with the same message, whether or not the address has an account, so the form cannot be used to find out who has one. Limits: 10 per IP and 3 per address per hour. |
+| `POST /auth/reset-password` | none | Body `{ "token", "password" }` (8 to 128 characters). Sets the new password, confirms the address, and uses the link up. Links expire after 1 hour. `400` for a bad, used or expired link. |
+
+Links in e-mails open the website at `/verify-email?token=...` and `/reset-password?token=...`.
+The server keeps only a hash of each token; a link works once; asking for a new link cancels the older one.
+A confirmation link cannot be used to reset a password, or the other way round.
+
+### New rule when `EMAIL_VERIFICATION=required` **(changed)**
+
+- The routes that add content answer **`403`** "Please confirm your e-mail address first. We sent you a link." until the address is confirmed:
+  `POST /maps`, `POST /maps/{id}/shares`, `POST /locations`, photo upload, notes, verify and reports.
+  Reading, signing in and deleting your own things are not affected.
+- The `moderator` role applies only to a confirmed address.
+- `GET /config` gains `email_verification` (boolean), so the site knows whether to ask people to confirm.
+- The server refuses to start if verification is required but no e-mail provider works.
 
 ---
 

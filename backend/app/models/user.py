@@ -1,12 +1,17 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, DateTime, Index, Integer, String, text
 
 from app.db.base import Base
 
 
 class User(Base):
     __tablename__ = "users"
+    # One account per address and per username, whatever the upper/lower case
+    __table_args__ = (
+        Index("uq_users_email_lower", text("lower(email)"), unique=True),
+        Index("uq_users_username_lower", text("lower(username)"), unique=True),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, nullable=False, index=True)
@@ -15,6 +20,8 @@ class User(Base):
     username = Column(String(30), nullable=True, index=True)
     name = Column(String(60), nullable=True)
     bio = Column(String(180), nullable=False, default="", server_default="")
+    # Set when the person opened the link e-mailed to this address, proving they own it
+    email_verified_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         DateTime,

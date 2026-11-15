@@ -5,7 +5,7 @@ import { Chip } from '../components/Chip';
 import { FieldCard } from '../components/FieldCard';
 import { useSession } from '../components/Layout';
 import { PhotoPlate } from '../components/PhotoPlate';
-import { addPhoto, fileToDataUrl, reportPlace, verifyPlace } from '../store/api';
+import { addPhoto, deletePlace, fileToDataUrl, reportPlace, verifyPlace } from '../store/api';
 import { findMap } from '../store/helpers';
 import { useAppState } from '../store/store';
 import { REPORT_KINDS, type ReportKind } from '../store/types';
@@ -34,6 +34,9 @@ export default function PlacePage() {
   if (load.status === 'loading') return <Loading label="Loading place…" />;
   if (load.status === 'error') return <LoadError message={load.error} />;
   if (!map || !place || load.result === 'missing') return <NotFound />;
+
+  // The author, the owner of the map, or a moderator may delete a place (the server checks this too)
+  const canDelete = Boolean(user && (place.addedBy === user.username || map.ownerId === user.id || user.role === 'moderator'));
 
   // Anyone can look at a public place. Confirming, adding photos or reporting needs an account.
   const needLogin = () => navigate('/signin', { state: { from: location.pathname + location.search } });
@@ -101,6 +104,21 @@ export default function PlacePage() {
               <input type="file" accept="image/*" className="sr-only" onChange={(e) => { void onPhoto(e.target.files?.[0]); e.target.value = ''; }} />
             </label>
             <Button variant="ghost" onClick={() => (user ? setReporting((r) => !r) : needLogin())} aria-expanded={reporting}>Report</Button>
+            {canDelete && (
+              <Button
+                variant="ghost"
+                className="text-danger"
+                onClick={() => {
+                  if (!window.confirm(`Delete "${place.name}" and its photos? This cannot be undone.`)) return;
+                  void run(async () => {
+                    await deletePlace(map.id, place.id);
+                    navigate(`/map/${map.id}`);
+                  });
+                }}
+              >
+                Delete place
+              </Button>
+            )}
           </div>
           {!user && (
             <p className="mt-3 text-sm text-ink/70">
