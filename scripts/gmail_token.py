@@ -100,7 +100,7 @@ def main() -> int:
     print("Paste these into Render: your API service, Environment page. Nowhere else.\n")
     print("EMAIL_PROVIDER=gmail_api")
     print("GMAIL_CLIENT_ID=" + client_id)
-    print("GMAIL_CLIENT_SECRET=" + client_secret)
+    print("GMAIL_CLIENT_SECRET=(the Client secret you typed above; copy it from Google Cloud)")
     print("GMAIL_REFRESH_TOKEN=" + refresh)
     print("GMAIL_SENDER=" + sender)
     print("=" * 70)
