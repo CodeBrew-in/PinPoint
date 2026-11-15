@@ -67,10 +67,9 @@ def test_update_me_requires_a_token(client):
 
 
 def test_moderator_role_comes_from_the_environment(client, make_user, monkeypatch):
-    monkeypatch.setenv("MODERATOR_EMAILS", "boss@pinpoint.com, other@pinpoint.com")
-
     boss = make_user("Boss@pinpoint.com")
     member = make_user("member@pinpoint.com")
+    monkeypatch.setenv("MODERATOR_EMAILS", "boss@pinpoint.com, other@pinpoint.com")
 
     assert client.get(f"{API}/auth/me", headers=boss).json()["role"] == "moderator"
     assert client.get(f"{API}/auth/me", headers=member).json()["role"] == "member"

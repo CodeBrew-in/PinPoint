@@ -16,7 +16,7 @@ def _lower_email(value: str) -> str:
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=8, max_length=128)
     username: Optional[str] = None
 
     _lower_email = field_validator("email")(_lower_email)
@@ -66,6 +66,12 @@ class UserRead(BaseModel):
     bio: str
     role: str
     created_at: UTCDateTime
+
+
+class AccountDelete(BaseModel):
+    """Deleting an account needs the password again, so a stolen login token alone cannot do it."""
+
+    password: str
 
 
 class Token(BaseModel):

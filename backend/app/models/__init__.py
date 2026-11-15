@@ -3,3 +3,4 @@
 from app.models.location import Location, LocationNote, Photo, Report  # noqa: F401
 from app.models.map import Map, MapShare  # noqa: F401
 from app.models.user import User  # noqa: F401
+from app.models.audit import AuditEvent  # noqa: F401

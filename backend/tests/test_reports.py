@@ -1,13 +1,14 @@
 from pathlib import Path
 
 API = "/api/v1"
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+from images import PNG
 
 
 def setup_world(client, make_user, monkeypatch):
     """A moderator, two members, one public map with one place."""
-    monkeypatch.setenv("MODERATOR_EMAILS", "mod@pinpoint.com")
     mod = make_user("mod@pinpoint.com", username="mod")
+    # Listed after the account exists, the order the deployment guide asks for
+    monkeypatch.setenv("MODERATOR_EMAILS", "mod@pinpoint.com")
     owner = make_user("owner@pinpoint.com", username="owner")
     visitor = make_user("visitor@pinpoint.com", username="visitor")
     map_id = client.post(f"{API}/maps", json={"title": "Patiala heritage", "visibility": "public"}, headers=owner).json()["id"]
@@ -36,7 +37,7 @@ def test_only_moderators_can_list_reports(client, make_user, monkeypatch):
 def test_reports_are_filtered_by_status_and_listed_newest_first(client, make_user, monkeypatch):
     mod, _, visitor, _, place_id = setup_world(client, make_user, monkeypatch)
     first = report(client, visitor, place_id, note="first")
-    report(client, visitor, place_id, note="second")
+    report(client, make_user(), place_id, note="second")  # one open report per person and place
     client.post(f"{API}/reports/{first['id']}/resolve", json={"action": "dismiss"}, headers=mod)
 
     open_notes = [r["note"] for r in client.get(f"{API}/reports", headers=mod).json()["items"]]

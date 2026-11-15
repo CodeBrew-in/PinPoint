@@ -1,12 +1,17 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, DateTime, Index, Integer, String, func
 
 from app.db.base import Base
 
 
 class User(Base):
     __tablename__ = "users"
+    # One account per address and per username, whatever the upper/lower case
+    __table_args__ = (
+        Index("uq_users_email_lower", func.lower("email"), unique=True),
+        Index("uq_users_username_lower", func.lower("username"), unique=True),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, nullable=False, index=True)
