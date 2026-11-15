@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.core.roles import is_moderator
+from app.core.roles import has_moderator_role
 from app.schemas.common import UTCDateTime
 
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{3,30}$")
@@ -65,7 +65,23 @@ class UserRead(BaseModel):
     name: str
     bio: str
     role: str
+    email_verified: bool
     created_at: UTCDateTime
+
+
+class TokenBody(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+
+
+class ForgotPassword(BaseModel):
+    email: EmailStr
+
+    _lower_email = field_validator("email")(_lower_email)
+
+
+class ResetPassword(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+    password: str = Field(min_length=8, max_length=128)
 
 
 class AccountDelete(BaseModel):
@@ -92,6 +108,7 @@ def user_read(user) -> UserRead:
         username=username,
         name=user.name or username,
         bio=user.bio or "",
-        role="moderator" if is_moderator(user.email) else "member",
+        role="moderator" if has_moderator_role(user) else "member",
+        email_verified=user.email_verified_at is not None,
         created_at=user.created_at,
     )

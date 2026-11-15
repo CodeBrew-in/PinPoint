@@ -4,7 +4,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.core.roles import is_moderator
+from app.core.emailconfig import verification_required
+from app.core.roles import has_moderator_role
 from app.core.security import verify_access_token
 from app.db.database import get_db
 from app.models.user import User
@@ -51,7 +52,17 @@ def current_user(
     return user
 
 
+def verified_user(user: User = Depends(current_user)) -> User:
+    """A signed-in user who confirmed their e-mail (only enforced when EMAIL_VERIFICATION=required)."""
+    if verification_required() and user.email_verified_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please confirm your e-mail address first. We sent you a link.",
+        )
+    return user
+
+
 def moderator_user(user: User = Depends(current_user)) -> User:
-    if not is_moderator(user.email):
+    if not has_moderator_role(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Moderators only")
     return user

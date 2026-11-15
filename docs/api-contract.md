@@ -13,6 +13,7 @@ before either side codes against the change.
 | 2 | 2026-11-02 | **Proposed, needs approval from both.** Adds maps, extra place fields (map, verify, notes, reports), moderators and profile fields. Everything in version 1 still works. See [Version 2 additions](#version-2-additions-proposed). |
 | 3 | 2026-11-15 | **Proposed, needs approval from both.** Pre-deployment hardening: delete routes, account deletion, quotas and rate limits (`429`), sharing only with existing accounts, random default usernames, photo metadata removal, paging. See [Version 3 additions](#version-3-additions-proposed). |
 | 4 | 2026-11-16 | **Proposed, needs approval from both.** Free hosting: photo links are signed and expire (`/api/v1/media/photos/{id}?exp&sig`), the public `/media` folder is removed, `GET /config`, signups can be closed (`403`). See [Version 4 additions](#version-4-additions-proposed). |
+| 5 | 2026-11-16 | **Proposed, needs approval from both.** E-mail: confirm an address, forgotten password, and the confirmed-e-mail rule. See [Version 5 additions](#version-5-additions-proposed). |
 
 ---
 
@@ -371,6 +372,35 @@ Why: a free host has no permanent disk, so photos are stored in the database, an
 
 - When the server setting `SIGNUPS=closed` is set, `POST /auth/signup` answers **`403`** with
   `{ "detail": "Signups are closed for now. Please check back later." }`. Signing in is not affected.
+
+## Version 5 additions (proposed)
+
+Why: e-mail addresses were never confirmed (SEC-034), and a forgotten password could not be recovered.
+E-mail is optional on the server: with no e-mail provider set up, none of this is active and everything behaves as in version 4.
+
+### New field and endpoints
+
+`User` gains `email_verified` (boolean). It is `false` until the person opens the link e-mailed to them.
+
+| Method and path | Auth | What it does |
+|---|---|---|
+| `POST /auth/verify-email` | none | Body `{ "token" }`. The token comes from the link in the e-mail. Returns `User`. `400` "This link is invalid or has expired" if the token is unknown, used or older than 24 hours. |
+| `POST /auth/resend-verification` | required | Sends a new link; older unused links stop working. `202`. `503` if e-mail is not set up. Limit: 3 per hour. |
+| `POST /auth/forgot-password` | none | Body `{ "email" }`. **Always `202`** with the same message, whether or not the address has an account, so the form cannot be used to find out who has one. Limits: 10 per IP and 3 per address per hour. |
+| `POST /auth/reset-password` | none | Body `{ "token", "password" }` (8 to 128 characters). Sets the new password, confirms the address, and uses the link up. Links expire after 1 hour. `400` for a bad, used or expired link. |
+
+Links in e-mails open the website at `/verify-email?token=...` and `/reset-password?token=...`.
+The server keeps only a hash of each token; a link works once; asking for a new link cancels the older one.
+A confirmation link cannot be used to reset a password, or the other way round.
+
+### New rule when `EMAIL_VERIFICATION=required` **(changed)**
+
+- The routes that add content answer **`403`** "Please confirm your e-mail address first. We sent you a link." until the address is confirmed:
+  `POST /maps`, `POST /maps/{id}/shares`, `POST /locations`, photo upload, notes, verify and reports.
+  Reading, signing in and deleting your own things are not affected.
+- The `moderator` role applies only to a confirmed address.
+- `GET /config` gains `email_verification` (boolean), so the site knows whether to ask people to confirm.
+- The server refuses to start if verification is required but no e-mail provider works.
 
 ---
 

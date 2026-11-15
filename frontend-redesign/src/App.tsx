@@ -3,6 +3,7 @@ import { Layout, RequireAuth } from './components/Layout';
 import AddPlace from './pages/AddPlace';
 import { SignIn, SignUp } from './pages/Auth';
 import CreateMap from './pages/CreateMap';
+import { ForgotPassword, ResetPassword, VerifyEmail } from './pages/EmailLinks';
 import Explore from './pages/Explore';
 import Landing from './pages/Landing';
 import { Contact, Privacy, Terms } from './pages/Legal';
@@ -21,6 +22,9 @@ export default function App() {
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         {/* Anyone can browse public maps and places. Private maps stay hidden until you are signed in. */}
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/contact" element={<Contact />} />

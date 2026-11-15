@@ -68,6 +68,28 @@ export async function signIn(emailRaw: string, password: string) {
   commit({ ...getState(), sessionUserId: user.id });
 }
 
+const NEEDS_BACKEND = 'E-mail links need the real backend. The browser-only demo has no e-mail.';
+
+export async function verifyEmail(token: string) {
+  if (!USE_API) throw new Error(NEEDS_BACKEND);
+  return remote.verifyEmail(token);
+}
+
+export async function resendVerification() {
+  if (!USE_API) throw new Error(NEEDS_BACKEND);
+  return remote.resendVerification();
+}
+
+export async function forgotPassword(email: string) {
+  if (!USE_API) throw new Error(NEEDS_BACKEND);
+  return remote.forgotPassword(email);
+}
+
+export async function resetPassword(token: string, password: string) {
+  if (!USE_API) throw new Error(NEEDS_BACKEND);
+  return remote.resetPassword(token, password);
+}
+
 export function signOut() {
   if (USE_API) return remote.signOut();
   commit({ ...getState(), sessionUserId: null });
