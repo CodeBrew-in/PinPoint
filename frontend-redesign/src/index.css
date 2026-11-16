@@ -41,7 +41,10 @@
   50% { transform: rotate(-12deg); }
 }
 
-/* Leaflet: soften the tiles so they sit on the cream page */
-.leaflet-tile-pane { filter: sepia(0.3) saturate(0.8) brightness(1.03); }
+/* Leaflet: clear tiles, with buttons and credit that match the site's cards */
 .leaflet-container { font-family: 'DM Sans', sans-serif; background: #F3EDDF; }
-.leaflet-control-zoom a { border-radius: 8px !important; color: #1D1D1F !important; }
+.leaflet-bar { border: 2px solid #1D1D1F !important; border-radius: 12px !important; box-shadow: 0 3px 0 rgba(0,0,0,.22) !important; overflow: hidden; }
+.leaflet-bar a { width: 40px !important; height: 40px !important; line-height: 38px !important; font-size: 22px !important; font-weight: 700; color: #1D1D1F !important; background: #FFFDF5 !important; border-bottom: 2px solid #1D1D1F !important; }
+.leaflet-bar a:last-child { border-bottom: 0 !important; }
+.leaflet-bar a:hover { background: #F3EDDF !important; }
+.leaflet-control-attribution { background: rgba(255,253,245,.9) !important; font-size: 11px; border-radius: 8px 0 0 0; }

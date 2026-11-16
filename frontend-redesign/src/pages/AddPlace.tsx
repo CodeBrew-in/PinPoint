@@ -1,6 +1,7 @@
 import exifr from 'exifr';
 import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { TILE_ATTRIBUTION, TILE_OPTIONS, TILE_URL } from '../lib/tiles';
 import { Link, useParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { Chip } from '../components/Chip';
@@ -308,7 +309,7 @@ function AddPlaceForm({ map }: { map: MapData }) {
         <span className="label">Click the map to set the location</span>
         <div className="card h-[420px] overflow-hidden md:h-[560px]">
           <MapContainer center={[latN || 20, lngN || 78]} zoom={12} className="h-full w-full">
-            <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} {...TILE_OPTIONS} />
             <PickPoint onPick={(a, b) => { setLat(a.toFixed(5)); setLng(b.toFixed(5)); }} />
             {coordsOk && <Recenter lat={latN} lng={lngN} />}
             {coordsOk && <Marker position={[latN, lngN]} icon={placePinIcon(0, true)} zIndexOffset={1000} />}
