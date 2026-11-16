@@ -14,7 +14,7 @@ typing_extensions==4.16.0
 uvicorn==0.52.4
 httpx==0.28.1
 SQLAlchemy==2.1.4
-psycopg[binary]==3.3.6
+psycopg[binary]==3.3.8
 alembic==1.20.0
 python-dotenv==1.2.4
 pwdlib[argon2]==0.3.1
