@@ -1,7 +1,7 @@
 import L from 'leaflet';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
-import { TILE_ATTRIBUTION, TILE_OPTIONS, TILE_URL } from '../lib/tiles';
+import { MapContainer, Marker, useMap } from 'react-leaflet';
+import { BaseMap } from '../components/BaseMap';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { DeleteMapButton } from '../components/DeleteMapButton';
@@ -153,7 +153,7 @@ function MapWithPlaces({ map, owner, contributors }: { map: MapData; owner: stri
 
       <section className="relative isolate h-full">
         <MapContainer center={[active.lat, active.lng]} zoom={6} className="h-full w-full" scrollWheelZoom>
-          <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} {...TILE_OPTIONS} />
+          <BaseMap />
           <Viewport places={map.places} active={active} />
           {map.places.map((p) => (
             <Marker
