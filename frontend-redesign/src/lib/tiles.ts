@@ -1,7 +1,8 @@
-/** One place that says which map pictures ("tiles") the site shows, so every map looks the same.
- *  OpenStreetMap's own tiles: no key needed, fine for light use with the credit shown.
- *  (CARTO tiles were tried and refuse requests from websites without an API key.)
- *  If this host is ever changed, also change img-src in render.yaml and frontend-redesign/nginx.conf. */
-export const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-export const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-export const TILE_OPTIONS = { maxZoom: 19 } as const;
+/** Where the map pictures come from. If a host changes, change img-src in render.yaml and nginx.conf too,
+ *  or the browser will block it.
+ *  Street: Esri World Street Map (free for light use, no key, credit required).
+ *  Satellite: Esri World Imagery (same terms). */
+export const STREET_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+export const STREET_CREDIT = 'Map &copy; Esri, HERE, Garmin, OpenStreetMap contributors';
+export const SATELLITE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+export const SATELLITE_CREDIT = 'Imagery &copy; Esri, Maxar, Earthstar Geographics';

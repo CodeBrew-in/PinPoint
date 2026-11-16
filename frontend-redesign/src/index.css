@@ -48,3 +48,8 @@
 .leaflet-bar a:last-child { border-bottom: 0 !important; }
 .leaflet-bar a:hover { background: #F3EDDF !important; }
 .leaflet-control-attribution { background: rgba(255,253,245,.9) !important; font-size: 11px; border-radius: 8px 0 0 0; }
+
+.look-switch { display: flex; }
+.look-switch button { padding: 8px 12px; font: 700 13px 'DM Sans', sans-serif; color: #1D1D1F; background: #FFFDF5; border: 0; cursor: pointer; }
+.look-switch button + button { border-left: 2px solid #1D1D1F; }
+.look-switch button.on { background: #1D1D1F; color: #FFFDF5; }
