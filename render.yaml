@@ -91,4 +91,4 @@ services:
       # Map tiles come from OpenStreetMap, fonts from Google Fonts, data and photos from the API (keep in step with its URL)
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; img-src 'self' data: blob: https://tiles.openfreemap.org https://server.arcgisonline.com https://codebrew-pinpoint-api.onrender.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://tiles.openfreemap.org https://codebrew-pinpoint-api.onrender.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; worker-src blob:; child-src blob:; object-src 'none'"
+        value: "default-src 'self'; img-src 'self' data: blob: https://server.arcgisonline.com https://codebrew-pinpoint-api.onrender.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://codebrew-pinpoint-api.onrender.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
